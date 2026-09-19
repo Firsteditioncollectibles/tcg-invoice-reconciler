@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+public/vendor/
+playwright-report/
+test-results/
+tmp/
+*.tsbuildinfo
+.env*
+!.env.example
+.vercel/

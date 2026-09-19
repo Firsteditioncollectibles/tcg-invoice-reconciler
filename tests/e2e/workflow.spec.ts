@@ -1,0 +1,172 @@
+import { test, expect } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+test("editor, consolidation, deletion, accurate totals, draft round-trip, and PDF download", async ({
+  page,
+}, info) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Your order. Reconciled." }),
+  ).toBeVisible();
+  await page.screenshot({ path: info.outputPath("home.png"), fullPage: true });
+  await page.getByRole("button", { name: "Try an example" }).click();
+  await expect(page.getByTestId("grand-total")).toHaveText("$16.54");
+  const exportButton = page.getByRole("button", {
+    name: "Download reconciled PDF",
+  });
+  await expect(exportButton).toBeDisabled();
+  await page.getByRole("button", { name: "Consolidate duplicates" }).click();
+  await expect(page.getByLabel("Quantity line 1", { exact: true })).toHaveValue(
+    "3",
+  );
+  await expect(page.getByTestId("grand-total")).toHaveText("$16.54");
+  await page.getByLabel("Delete line 2", { exact: true }).click();
+  await expect(page.getByTestId("grand-total")).toHaveText("$6.54");
+  await page.getByLabel("Quantity line 1", { exact: true }).fill("2");
+  await page.getByLabel("Unit price line 1", { exact: true }).fill("0.10");
+  await page.getByLabel("Discount", { exact: true }).fill("0.01");
+  await expect(page.getByTestId("grand-total")).toHaveText("$2.98");
+  await page.getByLabel("Quantity line 1", { exact: true }).fill("1.5");
+  await expect(
+    page.getByRole("alert").filter({ hasText: "whole number" }),
+  ).toBeVisible();
+  await expect(exportButton).toBeDisabled();
+  await page.getByLabel("Quantity line 1", { exact: true }).fill("2");
+  await page.getByRole("button", { name: "I checked every line" }).click();
+  await page.getByLabel("I checked the order details").check();
+  await page.getByRole("button", { name: "Preview document" }).click();
+  await expect(page.getByLabel("Reconciled document preview")).toContainText(
+    "Not a seller-issued invoice.",
+  );
+  await page.screenshot({
+    path: info.outputPath("reconciler-desktop.png"),
+    fullPage: true,
+  });
+  const pdfWait = page.waitForEvent("download");
+  await exportButton.click();
+  const pdf = await pdfWait;
+  expect(pdf.suggestedFilename()).toBe(
+    "reconciled-tcgplayer-SAMPLE-123456.pdf",
+  );
+  await pdf.saveAs(info.outputPath("reconciled.pdf"));
+  expect(
+    (await readFile(info.outputPath("reconciled.pdf")))
+      .subarray(0, 4)
+      .toString(),
+  ).toBe("%PDF");
+  const draftWait = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  const draft = await draftWait;
+  await draft.saveAs(info.outputPath("draft.json"));
+  await page.reload();
+  await page
+    .getByLabel("Open saved draft")
+    .setInputFiles(info.outputPath("draft.json"));
+  await expect(page.getByTestId("grand-total")).toHaveText("$2.98");
+  await expect(exportButton).toBeDisabled();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: info.outputPath("reconciler-mobile.png"),
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  expect(errors).toEqual([]);
+});
+for (const file of [
+  "tcgplayer-text.pdf",
+  "tcgplayer-screenshot.png",
+  "tcgplayer-scanned.pdf",
+]) {
+  test(`real file extraction: ${file}`, async ({ page }, info) => {
+    const requests: string[] = [];
+    page.on("request", (r) => {
+      if (
+        /^https?:/.test(r.url()) &&
+        !r.url().startsWith("http://127.0.0.1:3148")
+      )
+        requests.push(r.url());
+    });
+    await page.goto("/");
+    await page
+      .getByLabel("Upload TCGplayer screenshot or PDF")
+      .setInputFiles(`tests/fixtures/${file}`);
+    await expect(
+      page.getByLabel("Description line 1", { exact: true }),
+    ).toBeVisible({ timeout: 100_000 });
+    await expect(
+      page.getByLabel("Quantity line 1", { exact: true }),
+    ).toHaveValue("2");
+    await expect(
+      page.getByLabel("Unit price line 1", { exact: true }),
+    ).toHaveValue("1.25");
+    await expect(
+      page.getByLabel("Description line 1", { exact: true }),
+    ).toHaveValue("Pikachu 025/165");
+    await expect(
+      page.getByLabel("Condition and details line 1", { exact: true }),
+    ).toHaveValue("Near Mint");
+    await expect(page.getByLabel("Recipient", { exact: true })).toHaveValue(
+      "Sample Buyer",
+    );
+    await expect(page.getByTestId("grand-total")).toHaveText("$16.54");
+    await page.getByRole("button", { name: "I checked every line" }).click();
+    await page.getByLabel("I checked the order details").check();
+    const wait = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download reconciled PDF" }).click();
+    await (await wait).saveAs(info.outputPath("reconciled.pdf"));
+    expect(requests).toEqual([]);
+  });
+}
+test("bad file is actionable and does not destroy current edits", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Try an example" }).click();
+  page.on("dialog", (d) => d.accept());
+  await page.getByLabel("Upload TCGplayer screenshot or PDF").setInputFiles({
+    name: "broken.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("not a PDF"),
+  });
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByTestId("grand-total")).toHaveText("$16.54");
+  await expect(page.getByRole("button", { name: "Choose file" })).toBeEnabled();
+});
+test("cancelling an import during OCR initialization restores a usable editor", async ({
+  page,
+}) => {
+  await page.route("**/vendor/ocr/**", async (route) => {
+    await new Promise((r) => setTimeout(r, 2500));
+    await route.continue().catch(() => {});
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Try an example" }).click();
+  page.on("dialog", (d) => d.accept());
+  await page
+    .getByLabel("Upload TCGplayer screenshot or PDF")
+    .setInputFiles("tests/fixtures/tcgplayer-screenshot.png");
+  await page.getByRole("button", { name: "Cancel import" }).click();
+  await expect(
+    page.getByText("Import cancelled. Your previous order is unchanged."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choose file" })).toBeEnabled();
+  await expect(page.getByTestId("grand-total")).toHaveText("$16.54");
+});
+test("missing OCR assets fail clearly rather than leaving an endless scanner", async ({
+  page,
+}) => {
+  await page.route("**/vendor/ocr/worker.min.js", (route) =>
+    route.fulfill({ status: 404, body: "Missing test asset" }),
+  );
+  await page.goto("/");
+  await page
+    .getByLabel("Upload TCGplayer screenshot or PDF")
+    .setInputFiles("tests/fixtures/tcgplayer-screenshot.png");
+  await expect(page.locator(".message.error")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choose file" })).toBeEnabled();
+});
