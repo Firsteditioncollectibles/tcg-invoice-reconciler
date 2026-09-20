@@ -3,6 +3,7 @@ export type LineItem = {
   description: string;
   setName?: string;
   rarity?: string;
+  thumbnail?: string;
   details: string;
   seller: string;
   quantity: string;
@@ -19,6 +20,7 @@ export type Invoice = {
   billingAddress?: string;
   tracking?: string;
   shippingMethod?: string;
+  taxLabel?: string;
   sourceQuantity?: number | null;
   seller: string;
   recipient: string;
@@ -48,6 +50,7 @@ export function emptyInvoice(): Invoice {
     billingAddress: "",
     tracking: "",
     shippingMethod: "",
+    taxLabel: "Sales Tax",
     sourceQuantity: null,
     seller: "",
     recipient: "",
@@ -199,6 +202,7 @@ export function readDraft(raw: string): Invoice {
       "shippingMethod",
     ] as const)
       if (value[key] === undefined) value[key] = "";
+    if (value.taxLabel === undefined) value.taxLabel = "Sales Tax";
     if (value.sourceQuantity === undefined) value.sourceQuantity = null;
   }
   if (
@@ -249,6 +253,12 @@ export function readDraft(raw: string): Invoice {
       typeof item.reviewed !== "boolean" ||
       (item.setName !== undefined && typeof item.setName !== "string") ||
       (item.rarity !== undefined && typeof item.rarity !== "string") ||
+      (item.thumbnail !== undefined &&
+        (typeof item.thumbnail !== "string" ||
+          item.thumbnail.length > 100_000 ||
+          !/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(
+            item.thumbnail,
+          ))) ||
       ids.has(item.id)
     )
       throw new Error("The draft contains invalid line items.");

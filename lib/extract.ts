@@ -2,6 +2,7 @@ import type { Worker, Page } from "tesseract.js";
 import { marketplaceTable, marketplaceRows, type TextPage } from "./layout";
 import { parseOrder } from "./parser";
 import { cents, quantity } from "./invoice";
+import { captureThumbnails } from "./thumbnails";
 export type Extraction = {
   text: string;
   pages: number;
@@ -64,6 +65,7 @@ export function ocrLayout(data: Page, width: number, height: number): TextPage {
       y: w.bbox.y0,
       width: w.bbox.x1 - w.bbox.x0,
       height: w.bbox.y1 - w.bbox.y0,
+      confidence: w.confidence,
     })),
   };
 }
@@ -163,6 +165,7 @@ export async function extractFile(
     check();
     const layout = ocrLayout(result.data, image.width, image.height);
     const table = marketplaceTable(layout);
+    captureThumbnails(image, layout);
     if (table) {
       // Thin table rules and isolated "1" digits defeat whole-page OCR. Read each
       // quantity cell separately, using the matching price's vertical position.
@@ -213,6 +216,60 @@ export async function extractFile(
         tessedit_pageseg_mode: PSM.SPARSE_TEXT,
         tessedit_char_whitelist: "",
       });
+      // Card artwork contains letters that whole-page OCR can prepend to names.
+      // Re-read the text column without artwork, retaining its word geometry
+      // (and small hyphens which sparse whole-page recognition often misses).
+      if (layout.thumbnails?.length) {
+        onProgress("Reading card names and sets…");
+        await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
+        const left = Math.floor(
+          table.left + (table.details - table.left) * 0.145,
+        );
+        const top = Math.ceil(table.top + 5);
+        const column = await Promise.race([
+          worker.recognize(
+            image,
+            {
+              rectangle: {
+                left,
+                top,
+                width: Math.max(1, Math.floor(table.details - left - 5)),
+                height: Math.max(1, image.height - top - 8),
+              },
+            },
+            { text: true, blocks: true },
+          ),
+          stopped,
+        ]);
+        const names = ocrLayout(column.data, image.width, image.height).boxes;
+        for (const word of names) {
+          const previous = layout.boxes.find(
+            (b) =>
+              Math.abs(b.x - word.x) < word.height &&
+              Math.abs(b.y - word.y) < word.height / 2 &&
+              b.text.toLowerCase() === word.text.toLowerCase(),
+          );
+          if (previous && (previous.confidence ?? 0) > (word.confidence ?? 0))
+            word.text = previous.text;
+        }
+        // A failed second pass must not erase rows found by the first pass.
+        if (
+          rows.every((r) =>
+            names.some(
+              (b) =>
+                b.y + b.height / 2 > r.top && b.y + b.height / 2 < r.bottom,
+            ),
+          )
+        ) {
+          layout.boxes = [
+            ...layout.boxes.filter(
+              (b) => !(b.x < table.details && b.y > table.top),
+            ),
+            ...names,
+          ];
+        }
+        await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+      }
     }
     return {
       ...result.data,
@@ -281,6 +338,22 @@ export async function extractFile(
           )
         ) {
           texts.push(text);
+          if (marketplaceTable(textLayout)) {
+            const thumbViewport = page.getViewport({
+              scale: Math.min(2, 2400 / textLayout.width),
+            });
+            const thumbCanvas = document.createElement("canvas");
+            thumbCanvas.width = Math.ceil(thumbViewport.width);
+            thumbCanvas.height = Math.ceil(thumbViewport.height);
+            await Promise.race([
+              page.render({ canvas: thumbCanvas, viewport: thumbViewport })
+                .promise,
+              stopped,
+            ]);
+            captureThumbnails(thumbCanvas, textLayout);
+            thumbCanvas.width = 0;
+            thumbCanvas.height = 0;
+          }
           layout.push(textLayout);
         } else {
           const natural = page.getViewport({ scale: 1 });

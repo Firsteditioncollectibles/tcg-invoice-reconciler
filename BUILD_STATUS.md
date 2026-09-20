@@ -1,7 +1,19 @@
 # V1.1 handover checkpoint — 20 September 2026
 
-Status: V1.1 document-box editing is implemented and locally verified, ready to replace V1 at https://tcg-invoice-reconciler.vercel.app/. Code remains on `feat/tcgplayer-reconciler-v1`.
+Status: V1.1 screenshot-matched editing/export is implemented and locally verified, ready to replace V1 at https://tcg-invoice-reconciler.vercel.app/. Code remains on `feat/tcgplayer-reconciler-v1`.
 Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
+
+## 20 September exact-layout correction — current
+
+- User explicitly requested the exact supplied marketplace screenshot layout. Replaced the approximate boxed editor and auto-table PDF with one shared measured drawing layout: source header buttons, four unboxed metadata columns, source tax label, blue card names, actual card thumbnails, alternating rows and matching column widths/row spacing. The reviewed 13-row source exports at the same 1436:1632 proportions. Longer edited fields wrap; headers/metadata/rows expand and long orders paginate without cutting rows.
+- All order/card text remains editable in place. Delete/review/seller controls sit outside the document; discounts, package reference and notes remain available below it. Summary quantities/subtotal/total stay calculated. Large valid charge amounts fit their summary cells without wrapping digits into a neighbouring amount.
+- As requested, no large title/disclaimer blocks, zero-discount line, duplicate bottom total or printed page-number footer are added. The source-style Contact Seller/Rate Transaction buttons are decorative and perform no external action. Reconciliation identity remains in the app, PDF metadata and download filename. Output is not newly seller-issued.
+- Screenshot/scanned-PDF and native-PDF imports capture small thumbnail crops locally. Drafts preserve these crops and reject remote image URLs. No source image, real extracted draft, private preview or customer details are committed.
+- Visual verification found and fixed OCR boundary drift which copied neighbouring channel/address words into the wrong field. Region selection now uses word centres. Small punctuation stays on its line. A cropped card-text OCR pass avoids artwork being prepended to card names and retains the higher-confidence capitalization when passes agree on letters. The scanned-PDF capitalization regression found during testing was reproduced and corrected.
+- Final local `npm run check` passed: typecheck, **23/23 unit/PDF tests**, production build. New PDF assertions read actual exported coordinates against independently measured screenshot positions, and check large shipping/tax amounts. The 13 browser workflows were verified (12 passed on the initial full run; the remaining scanned-PDF workflow passed after the capitalization fix in 14.7s). The full GitHub workflow remains the final gate for this commit.
+- **2/2 private supplied-source edit/export/draft workflows passed in 27.3s**. A separate current-screenshot layout/thumbnail test passed in 13.5s: 13 rows, 21 cards, $68.02 subtotal and $75.85 total. Remaining ambiguous country/set-code OCR characters were reviewed and corrected in place against the attachment for the private PDF preview; arbitrary OCR is still review-required.
+- Visually inspected the actual-source editor and exported PDF, plus wrapped rows on a long-order PDF. The private matching-layout PDF was made available to the user separately. Existing public evidence PDFs show earlier layouts and are historical; current synthetic exports are retained by CI.
+- No deployment occurred. The dedicated reconciler production site is still the old V1. The prior automatic approval rejection for an insufficiently scoped GitHub/Vercel connection is unresolved; do not retry that connection without the requested repository-only authorization. CardScout remains entirely untouched.
 
 ## 20 September QA pass — edit every field in the supplied order
 

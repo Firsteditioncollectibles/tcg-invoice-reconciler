@@ -50,9 +50,9 @@ test("long orders paginate with wrapped descriptions", async () => {
   const pdf = await createReconciledPdf(d, await fonts());
   assert.ok(pdf.getNumberOfPages() >= 4);
   const pages = await pdfPages(new Uint8Array(pdf.output("arraybuffer")));
-  pages.forEach((text, index) => {
+  pages.forEach((text) => {
     assert.match(text, /ITEMS DETAILS PRICE QUANTITY/);
-    assert.ok(text.includes(`Page ${index + 1}`));
+    assert.doesNotMatch(text, /Page \d+|Reconciled total/);
     assert.doesNotMatch(
       text,
       /Buyer-prepared|Not a seller-issued|RECONCILED SHIPMENT DOCUMENT/,
@@ -79,4 +79,75 @@ test("cannot export invalid, empty or unreviewed items", async () => {
     createReconciledPdf({ ...d, recipient: "漢字" }, await fonts()),
     /supports English/,
   );
+});
+
+test("export keeps the supplied marketplace geometry without added boxes or footer", async () => {
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const layout = JSON.parse(
+    await readFile("tests/fixtures/marketplace-layout.json", "utf8"),
+  );
+  const d = parseOrder("Synthetic source", "fixture.pdf", [layout]);
+  d.items.forEach((i) => {
+    i.reviewed = true;
+  });
+  d.shippingMethod = "Standard (est.delivery by\nSeptember 28, 2026) - $1.48";
+  const exported = await createReconciledPdf(d, await fonts());
+  const task = getDocument({
+    data: new Uint8Array(exported.output("arraybuffer")),
+  });
+  try {
+    const pdf = await task.promise;
+    assert.equal(pdf.numPages, 1);
+    const p = await pdf.getPage(1);
+    const viewport = p.getViewport({ scale: 1436 / p.view[2] });
+    assert.ok(Math.abs(viewport.height - 1632) < 1);
+    const content = await p.getTextContent();
+    const actual = content.items.filter((i) => "str" in i);
+    // Coordinates measured independently from the attached marketplace screenshot.
+    for (const [label, x, y] of [
+      ["ORDER DATE", 28, 52],
+      ["CHANNEL", 310, 52],
+      ["ORDER NUMBER", 592, 52],
+      ["ORDER SUMMARY", 28, 168],
+      ["SHIP TO", 374, 168],
+      ["BILL TO", 720, 168],
+      ["SHIPPED AND SOLD BY", 1066, 168],
+      ["ITEMS", 40, 455],
+      ["DETAILS", 530, 455],
+      ["PRICE", 1034, 455],
+      ["QUANTITY", 1221, 455],
+      ["Pikachu 025/165", 100, 518],
+    ] as const) {
+      const run = actual.find((i) => i.str === label);
+      assert.ok(run, label);
+      const [px, py] = viewport.convertToViewportPoint(
+        run.transform[4],
+        run.transform[5],
+      );
+      assert.ok(
+        Math.abs(px - x) < 1 && Math.abs(py - y) < 1,
+        `${label}: ${px}, ${py}`,
+      );
+    }
+    const text = actual.map((i) => i.str).join(" ");
+    assert.match(text, /Contact Seller/);
+    assert.match(text, /Rate Transaction/);
+    assert.doesNotMatch(
+      text,
+      /Discount:|Reconciled total|Page \d+|Buyer-prepared/,
+    );
+  } finally {
+    await task.destroy();
+  }
+});
+
+test("larger shipping and tax amounts remain intact within their summary cells", async () => {
+  const d = sample();
+  d.shipping = "1234.56";
+  d.tax = "9876.54";
+  const pdf = await createReconciledPdf(d, await fonts());
+  const [text] = await pdfPages(new Uint8Array(pdf.output("arraybuffer")));
+  assert.match(text, /Shipping: \$1,234\.56/);
+  assert.match(text, /Sales Tax: \$9,876\.54/);
+  assert.match(text, /Total: \$11,113\.60/);
 });

@@ -1376,3 +1376,126 @@ input.sr-only {
     gap: 5px;
   }
 }
+@font-face {
+  font-family: TCGOrder;
+  src: url("/vendor/standard_fonts/LiberationSans-Regular.ttf")
+    format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: TCGOrder;
+  src: url("/vendor/standard_fonts/LiberationSans-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
+.source-layout-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow: auto;
+  margin: 20px 0;
+}
+.source-layout {
+  position: relative;
+  transform-origin: top left;
+  font-family: TCGOrder, Arial, sans-serif;
+}
+.source-drawing {
+  display: block;
+  background: white;
+  pointer-events: none;
+}
+.source-input {
+  position: absolute;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--field-color);
+  font:
+    22px TCGOrder,
+    Arial,
+    sans-serif;
+  resize: none;
+  overflow: hidden;
+  box-shadow: none;
+  min-height: 0;
+  outline: 0;
+}
+.source-input:hover {
+  outline: 2px solid #2999da77;
+}
+.source-input:focus {
+  color: var(--field-color);
+  background: #fff;
+  outline: 2px solid #168bd0;
+  overflow: auto;
+}
+.source-input:disabled {
+  background: transparent;
+  color: transparent;
+}
+.source-row-controls {
+  position: absolute;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 5px;
+  font:
+    14px Arial,
+    sans-serif;
+}
+.source-row-controls label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.source-row-controls input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+.source-row-controls details {
+  width: 100%;
+  font-size: 12px;
+}
+.source-row-controls details[open] {
+  position: absolute;
+  top: 35px;
+  left: 0;
+  z-index: 3;
+  width: 220px;
+  background: white;
+  border: 1px solid #ddd;
+  padding: 8px;
+  box-shadow: 0 2px 10px #0002;
+}
+.source-row-controls details input {
+  width: 100%;
+  font-size: 14px;
+  padding: 6px;
+}
+.source-row-controls pre {
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+.additional-fields {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  margin-top: 20px;
+}
+.additional-fields > label {
+  display: block;
+  font-size: 13px;
+  margin: 10px 0;
+}
+.additional-fields > label > input {
+  display: block;
+  width: min(100%, 480px);
+  margin-top: 5px;
+}

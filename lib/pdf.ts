@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
-import { autoTable } from "jspdf-autotable";
-import { DISCLOSURE, cents, money, totals, type Invoice } from "./invoice";
+import { orderSheets, ORDER_WIDTH } from "./document-layout";
+import { DISCLOSURE, totals, type Invoice } from "./invoice";
 
 export async function createReconciledPdf(
   invoice: Invoice,
@@ -39,9 +39,6 @@ export async function createReconciledPdf(
   doc.addFileToVFS("LiberationSans-Bold.ttf", base64(loaded.bold));
   doc.addFont("LiberationSans-Regular.ttf", "LiberationSans", "normal");
   doc.addFont("LiberationSans-Bold.ttf", "LiberationSans", "bold");
-  const width = doc.internal.pageSize.getWidth();
-  const height = doc.internal.pageSize.getHeight();
-  const margin = 38;
   doc.setProperties({
     title: `Reconciled TCGplayer order ${invoice.orderNumber}`,
     author: "Buyer-prepared reconciliation",
@@ -56,6 +53,7 @@ export async function createReconciledPdf(
     invoice.billingAddress,
     invoice.tracking,
     invoice.shippingMethod,
+    invoice.taxLabel,
     invoice.seller,
     invoice.recipient,
     invoice.address,
@@ -77,159 +75,63 @@ export async function createReconciledPdf(
     throw new Error(
       "PDF export currently supports English and Latin accented text. Replace unsupported symbols in the document before exporting.",
     );
-  const normal = (value: string) =>
-    value.replace(/[–—]/g, "-").replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
-  const footer = () => {
-    doc.setFont("LiberationSans", "normal");
-    doc.setTextColor(86);
-    doc.setFontSize(7);
-    doc.text(
-      `Page ${doc.getCurrentPageInfo().pageNumber}`,
-      width - margin,
-      height - 29,
-      { align: "right" },
+  const scale = 595.28 / ORDER_WIDTH;
+  const sheets = orderSheets(
+    invoice,
+    (value, bold = false) => {
+      doc.setFont("LiberationSans", bold ? "bold" : "normal");
+      doc.setFontSize(22 * scale);
+      return doc.getTextWidth(value) / scale;
+    },
+    true,
+  );
+  doc.deletePage(1);
+  for (const sheet of sheets) {
+    doc.addPage(
+      [sheet.width * scale, sheet.height * scale],
+      sheet.width > sheet.height ? "landscape" : "portrait",
     );
-  };
-  const after = () =>
-    (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-  autoTable(doc, {
-    startY: margin,
-    theme: "grid",
-    margin: { left: margin, right: margin, top: margin, bottom: 55 },
-    styles: {
-      font: "LiberationSans",
-      fontSize: 8,
-      cellPadding: 7,
-      overflow: "linebreak",
-      textColor: [65, 70, 78],
-      lineColor: [215, 215, 215],
-      lineWidth: 0.4,
-    },
-    body: [
-      [
-        `ORDER DATE\n${normal(invoice.orderDate) || "Not specified"}`,
-        `CHANNEL\n${normal(invoice.channel || "TCG Marketplace")}`,
-        `ORDER NUMBER\n${normal(invoice.orderNumber)}`,
-      ],
-    ],
-  });
-  autoTable(doc, {
-    startY: after(),
-    theme: "grid",
-    margin: { left: margin, right: margin, top: margin, bottom: 55 },
-    styles: {
-      font: "LiberationSans",
-      fontSize: 8,
-      cellPadding: 7,
-      overflow: "linebreak",
-      textColor: [65, 70, 78],
-      lineColor: [225, 225, 225],
-      lineWidth: 0.3,
-      valign: "top",
-    },
-    columnStyles: {
-      0: { cellWidth: 120 },
-      1: { cellWidth: 130 },
-      2: { cellWidth: 125 },
-      3: { cellWidth: width - 2 * margin - 375 },
-    },
-    body: [
-      [
-        `ORDER SUMMARY\nQuantity: ${t.count}\nSubtotal: ${money(t.subtotal)}\nShipping: ${money(t.shipping!)}\nSales tax: ${money(t.tax!)}\nDiscount: -${money(t.discount!)}\nTotal: ${money(t.total)}`,
-        normal(
-          `SHIP TO\n${invoice.recipient || "Not specified"}\n${invoice.address}\n${invoice.reference ? "Package: " + invoice.reference : ""}`,
-        ),
-        normal(
-          `BILL TO\n${invoice.billingRecipient || "Not specified"}\n${invoice.billingAddress || ""}`,
-        ),
-        normal(
-          `SHIPPED AND SOLD BY\n${invoice.seller || "See line items"}\n${invoice.tracking ? "Tracking: " + invoice.tracking : ""}\n${invoice.shippingMethod || ""}`,
-        ),
-      ],
-    ],
-  });
-  const differentSellers =
-    new Set(invoice.items.map((i) => i.seller).filter(Boolean)).size > 1;
-  autoTable(doc, {
-    startY: after() + 18,
-    margin: { top: margin, left: margin, right: margin, bottom: 55 },
-    head: [["ITEMS", "DETAILS", "PRICE", "QUANTITY"]],
-    body: invoice.items.map((i) => [
-      normal([i.description, i.setName].filter(Boolean).join("\n")),
-      normal(
-        [
-          i.rarity ? `Rarity: ${i.rarity}` : "",
-          i.details ? `Condition: ${i.details}` : "",
-          i.seller && (differentSellers || i.seller !== invoice.seller)
-            ? `Seller: ${i.seller}`
-            : "",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      ),
-      money(cents(i.unitPrice)!),
-      i.quantity,
-    ]),
-    theme: "grid",
-    styles: {
-      font: "LiberationSans",
-      fontSize: 8,
-      cellPadding: 7,
-      lineColor: [220, 226, 233],
-      lineWidth: 0.4,
-      overflow: "linebreak",
-      textColor: [35, 49, 63],
-    },
-    headStyles: {
-      fillColor: [237, 237, 237],
-      textColor: [75, 75, 75],
-      fontStyle: "bold",
-    },
-    alternateRowStyles: { fillColor: [246, 248, 251] },
-    columnStyles: {
-      0: { cellWidth: width - 2 * margin - 288 },
-      1: { cellWidth: 164 },
-      2: { cellWidth: 65, halign: "right", valign: "middle" },
-      3: { cellWidth: 59, halign: "center", valign: "middle" },
-    },
-    rowPageBreak: "avoid",
-  });
-  autoTable(doc, {
-    startY: after() + 10,
-    margin: {
-      left: width - margin - 236,
-      right: margin,
-      top: margin,
-      bottom: 55,
-    },
-    theme: "plain",
-    styles: {
-      font: "LiberationSans",
-      fontSize: 10,
-      cellPadding: 6,
-      fontStyle: "bold",
-      fillColor: [235, 241, 249],
-    },
-    columnStyles: {
-      0: { cellWidth: 145 },
-      1: { cellWidth: 91, halign: "right" },
-    },
-    body: [["Reconciled total (USD)", money(t.total)]],
-  });
-  if (invoice.notes.trim())
-    autoTable(doc, {
-      startY: after() + 20,
-      margin: { left: margin, right: margin, top: margin, bottom: 55 },
-      head: [["RECONCILIATION NOTES"]],
-      body: [[normal(invoice.notes)]],
-      theme: "plain",
-      pageBreak: "avoid",
-      styles: { font: "LiberationSans", fontSize: 9, cellPadding: 5 },
-      headStyles: { textColor: [20, 44, 74] },
-    });
-  for (let page = 1; page <= doc.getNumberOfPages(); page++) {
-    doc.setPage(page);
-    footer();
+    for (const r of sheet.rects) {
+      if (r.fill !== "none") doc.setFillColor(r.fill);
+      if (r.stroke) doc.setDrawColor(r.stroke);
+      doc.setLineWidth((r.strokeWidth ?? 0) * scale);
+      const style = r.fill === "none" ? "S" : r.stroke ? "FD" : "F";
+      if (r.radius)
+        doc.roundedRect(
+          r.x * scale,
+          r.y * scale,
+          r.width * scale,
+          r.height * scale,
+          r.radius * scale,
+          r.radius * scale,
+          style,
+        );
+      else
+        doc.rect(
+          r.x * scale,
+          r.y * scale,
+          r.width * scale,
+          r.height * scale,
+          style,
+        );
+    }
+    for (const image of sheet.images)
+      doc.addImage(
+        image.src,
+        image.src.startsWith("data:image/jpeg") ? "JPEG" : "PNG",
+        image.x * scale,
+        image.y * scale,
+        image.width * scale,
+        image.height * scale,
+      );
+    for (const run of sheet.texts) {
+      doc.setFont("LiberationSans", run.bold ? "bold" : "normal");
+      doc.setFontSize(run.size * scale);
+      doc.setTextColor(run.color);
+      doc.text(run.text, run.x * scale, run.y * scale, {
+        align: run.align ?? "left",
+      });
+    }
   }
   return doc;
 }

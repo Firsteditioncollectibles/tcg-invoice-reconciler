@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseOrder } from "../lib/parser";
 import { totals, consolidate, emptyInvoice, readDraft } from "../lib/invoice";
-import type { TextPage } from "../lib/layout";
+import { layoutLines, type TextPage } from "../lib/layout";
 const page = () =>
   JSON.parse(
     readFileSync("tests/fixtures/marketplace-layout.json", "utf8"),
@@ -33,6 +33,34 @@ test("marketplace columns keep summary, addresses and 13 multi-line products sep
   assert.equal(totals(doc).total, 7585);
   assert.equal(doc.sourceTotal, 7585);
   assert.equal(doc.warnings.length, 0);
+});
+test("OCR words starting left of a neighbouring heading stay in their own column", () => {
+  const p = page();
+  const channel = p.boxes.find((b) => b.text === "CHANNEL")!;
+  const bill = p.boxes.find((b) => b.text === "BILL")!;
+  const tcg = p.boxes.find((b) => b.text === "TCG")!;
+  tcg.x = channel.x - 1;
+  p.boxes.push({
+    text: "88",
+    x: bill.x - 2,
+    y: bill.y + 70,
+    width: 24,
+    height: 21,
+  });
+  const doc = parseOrder("Synthetic source", "fixture.png", [p]);
+  assert.equal(doc.orderDate, "September 20, 2026");
+  assert.equal(doc.channel, "TCG Marketplace");
+  assert.ok(!doc.address.includes("88"));
+  assert.ok(doc.billingAddress!.includes("88"));
+});
+test("small hyphens keep their place within an OCR text line", () => {
+  const lines = layoutLines([
+    { text: "Example", x: 100, y: 500, width: 80, height: 22 },
+    { text: "-", x: 190, y: 513, width: 8, height: 3 },
+    { text: "001/100", x: 210, y: 500, width: 80, height: 22 },
+  ]);
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].text, "Example - 001/100");
 });
 test("an unreadable quantity stays empty and blocks export instead of inventing one", () => {
   const p = page();

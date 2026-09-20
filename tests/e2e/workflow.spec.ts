@@ -268,6 +268,7 @@ for (const file of [
     ).toBeVisible({ timeout: 100_000 });
     await expect(page.getByTestId("grand-total")).toHaveText("$75.85");
     await expect(page.getByTestId("card-count")).toHaveText("21");
+    await expect(page.locator(".source-drawing image")).toHaveCount(13);
     await expect(
       page.getByLabel("Order number *", { exact: true }),
     ).toHaveValue("SYNTHETIC-001-TEST");

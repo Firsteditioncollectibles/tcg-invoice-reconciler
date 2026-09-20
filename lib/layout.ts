@@ -6,8 +6,14 @@ export type TextBox = {
   y: number;
   width: number;
   height: number;
+  confidence?: number;
 };
-export type TextPage = { width: number; height: number; boxes: TextBox[] };
+export type TextPage = {
+  width: number;
+  height: number;
+  boxes: TextBox[];
+  thumbnails?: { center: number; dataUrl: string }[];
+};
 const clean = (s: string) => s.replace(/[^a-z0-9]/gi, "").toLowerCase();
 const middle = (b: TextBox) => b.y + b.height / 2;
 export function layoutLines(boxes: TextBox[]): TextBox[] {
@@ -18,7 +24,7 @@ export function layoutLines(boxes: TextBox[]): TextBox[] {
     const row = rows.find(
       (r) =>
         Math.abs(middle(r[0]) - middle(box)) <
-        Math.max(2, Math.min(r[0].height, box.height) * 0.45),
+        Math.max(3, Math.max(r[0].height, box.height) * 0.45),
     );
     if (row) row.push(box);
     else rows.push([box]);
@@ -47,7 +53,11 @@ function region(
   bottom: number,
 ) {
   return page.boxes.filter(
-    (b) => b.x >= left && b.x < right && middle(b) > top && middle(b) < bottom,
+    (b) =>
+      b.x + b.width / 2 >= left &&
+      b.x + b.width / 2 < right &&
+      middle(b) > top &&
+      middle(b) < bottom,
   );
 }
 function phrase(page: TextPage, name: string): TextBox | undefined {
@@ -256,7 +266,7 @@ export function parseMarketplaceLayout(pages: TextPage[]): Invoice | null {
       if (tracking) {
         const lines = below(tracking, page.width, table.top - table.height * 2);
         doc.tracking ||= lines.shift() ?? "";
-        doc.shippingMethod ||= lines.join(" ");
+        doc.shippingMethod ||= lines.join("\n");
       }
     }
     if (summary) {
@@ -276,7 +286,10 @@ export function parseMarketplaceLayout(pages: TextPage[]): Invoice | null {
         else if (/^total$/i.test(m[1])) doc.sourceTotal = value;
         else if (/^shipping$/i.test(m[1])) doc.shipping = decimal(value);
         else if (/^discount$/i.test(m[1])) doc.discount = decimal(value);
-        else doc.tax = decimal(value);
+        else {
+          doc.tax = decimal(value);
+          doc.taxLabel = m[1];
+        }
       }
     }
     marketplaceRows(page, table).forEach(({ price, top, bottom }) => {
@@ -317,6 +330,9 @@ export function parseMarketplaceLayout(pages: TextPage[]): Invoice | null {
         description: itemLines[0],
         setName: itemLines.slice(1).join(" "),
         rarity,
+        thumbnail: page.thumbnails?.find(
+          (t) => t.center > top && t.center < bottom,
+        )?.dataUrl,
         details: condition,
         seller: doc.seller,
         quantity: q,
