@@ -732,22 +732,10 @@ dd {
 .document-preview {
   background: white;
   border: 1px solid var(--border);
-  border-top: 7px solid var(--navy);
   padding: 38px;
   max-width: 880px;
   margin: 30px auto;
   box-shadow: 0 4px 20px #1729420a;
-}
-.document-heading h2 {
-  font-size: 25px;
-}
-.document-heading > strong {
-  font-size: 11px;
-  letter-spacing: 1px;
-}
-.document-heading p {
-  font-size: 10px;
-  color: var(--muted);
 }
 .preview-metadata {
   display: grid;
@@ -1049,9 +1037,6 @@ input.sr-only {
   }
   main {
     padding: 0;
-  }
-  .document-heading p {
-    color: black;
   }
   .document-preview tr {
     break-inside: avoid;

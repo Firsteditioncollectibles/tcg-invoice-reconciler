@@ -18,7 +18,7 @@ const sample = () => {
   d.items = d.items.map((i) => ({ ...i, reviewed: true }));
   return d;
 };
-test("PDF has correct metadata, total and permanent reconciliation disclosure", async () => {
+test("PDF retains reconciliation metadata and filename", async () => {
   const d = sample();
   const pdf = await createReconciledPdf(d, await fonts());
   const raw = pdf.output();
@@ -32,7 +32,7 @@ test("PDF has correct metadata, total and permanent reconciliation disclosure", 
     new Uint8Array(pdf.output("arraybuffer")),
   );
 });
-test("long orders paginate with wrapped descriptions and repeat disclosure", async () => {
+test("long orders paginate with wrapped descriptions", async () => {
   const d = sample();
   d.items = Array.from({ length: 100 }, (_, i) => ({
     ...d.items[0],

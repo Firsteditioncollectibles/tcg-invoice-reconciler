@@ -511,11 +511,6 @@ export default function Home() {
                 className="document-preview"
                 aria-label="Reconciled document preview"
               >
-                <div className="document-heading">
-                  <h2>TCGplayer order</h2>
-                  <strong>RECONCILED SHIPMENT DOCUMENT</strong>
-                  <p>{DISCLOSURE}</p>
-                </div>
                 <div className="preview-metadata">
                   <p>
                     <strong>Order:</strong> {doc.orderNumber}

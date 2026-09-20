@@ -3,6 +3,15 @@
 Status: V1.1 document-box editing is implemented and locally verified, ready to replace V1 at https://tcg-invoice-reconciler.vercel.app/. Code remains on `feat/tcgplayer-reconciler-v1`.
 Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
 
+## 20 September follow-up — clean PDF layout
+
+- The user supplied cropped PDF header/footer screenshots and explicitly said "dont need any of this". Removed the large TCGplayer title, shipment-document subtitle and printed buyer-prepared disclaimer blocks, including the corresponding preview heading. PDFs now begin with order boxes at the normal top margin; continuation pages keep table headings and page numbers.
+- Reconciliation remains identified in the app, exported filename, PDF metadata and total label. This user preference supersedes the earlier requirement for printed disclosure blocks; output must still not be represented as newly seller-issued.
+- Validation: typecheck and production build passed; **3/3 PDF tests** and **2/2 affected browser workflows (6.6s)** passed. Browser checks included editing/consolidating/deleting, accurate totals, draft reopening, preview, native marketplace PDF import and downloaded PDF export.
+- Visually checked the updated one-page synthetic marketplace export and continuation/final pages of a 100-row export. All four long-order pages have text inside the margins, page numbers, and no removed header/disclaimer text. Updated example: `docs/evidence/marketplace-boxes-example.pdf`.
+- GitHub Actions run `35510474081` passed for the preceding marketplace-box implementation (`62659ea831cee4dadff22733f34830925cf126f6`).
+- This follow-up is not deployed. The user has not yet answered the prior request to connect only this repository to the existing dedicated Vercel project. The upload/tool failures and scoped GitHub authorization blocker below remain unresolved.
+
 ## 20 September correction — marketplace order boxes
 
 - The supplied real marketplace screenshot exposed a serious V1 parsing gap: the live parser mixed summary amounts into card rows. Synthetic packing-slip fixtures had not covered the multi-column marketplace layout.
@@ -71,4 +80,4 @@ The usual Playwright browser download timed out here. A Chromium binary obtained
 1. Keep this V1 branch as the single source of the build; inspect remote HEAD before adding work.
 2. Reproduce any real-receipt parsing failures with anonymized fixtures and test the fix before proceeding.
 3. For further application changes, rerun the affected checks and deploy to the verified existing reconciler project. Keep deployment protection enabled and verify the live workflow after redeploying.
-4. Retain the buyer-prepared / not seller-issued disclosure in all export paths.
+4. Honor the clean PDF preference above; retain reconciliation identification in the app, filename, PDF metadata and total label. Do not restore the removed title or printed disclaimer blocks.

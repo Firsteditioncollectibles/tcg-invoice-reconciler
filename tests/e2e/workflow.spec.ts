@@ -37,7 +37,7 @@ test("editor, consolidation, deletion, accurate totals, draft round-trip, and PD
   await page.getByLabel("I checked the order details").check();
   await page.getByRole("button", { name: "Preview document" }).click();
   await expect(page.getByLabel("Reconciled document preview")).toContainText(
-    "Not a seller-issued invoice.",
+    "$2.98",
   );
   await page.screenshot({
     path: info.outputPath("reconciler-desktop.png"),

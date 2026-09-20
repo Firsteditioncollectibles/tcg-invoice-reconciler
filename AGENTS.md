@@ -13,7 +13,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Work only in Firsteditioncollectibles/tcg-invoice-reconciler. Never access, reuse or modify CardScout repositories, branches, deployments, environment variables, databases or services.
 - Read BUILD_STATUS.md before continuing. Update it with completed work, actual test results and concrete remaining work when handing over.
 - The user explicitly authorized always skipping Vercel's optional "Secure Your Account with 2FA" setup prompt when it appears. This preference concerns that optional onboarding prompt.
-- This is a client-only TCGplayer reconciler. Keep file processing local and require review before export. Preserve the buyer-prepared / not seller-issued disclosure in PDFs and previews.
+- This is a client-only TCGplayer reconciler. Keep file processing local and require review before export. The user explicitly requested removal of the PDF title and repeated buyer-prepared disclaimer blocks on 20 September 2026. PDFs and their previews now start with order details. Keep reconciliation identified in the app, download filename, PDF metadata and reconciled total; do not represent the output as newly seller-issued.
 - Keep money calculations in integer cents. Do not silently accept invalid monetary inputs or merge different sellers, conditions, card variants or prices.
 - Test the affected stage before proceeding. Required V1 checks are documented in README.md.
 - No real customer records, private invoices, credentials, or environment files belong in this public repository. Use synthetic fixtures.

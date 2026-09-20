@@ -79,32 +79,10 @@ export async function createReconciledPdf(
     );
   const normal = (value: string) =>
     value.replace(/[–—]/g, "-").replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
-  const header = () => {
-    doc.setFillColor(20, 44, 74);
-    doc.rect(0, 0, width, 8, "F");
-    doc.setFont("LiberationSans", "bold");
-    doc.setFontSize(19);
-    doc.setTextColor(20, 44, 74);
-    doc.text("TCGplayer order", margin, 42);
-    doc.setFontSize(10);
-    doc.setTextColor(67, 86, 107);
-    doc.text("RECONCILED SHIPMENT DOCUMENT", margin, 61);
-    doc.setFont("LiberationSans", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(70);
-    doc.text(DISCLOSURE, margin, 78);
-  };
   const footer = () => {
-    doc.setDrawColor(213, 221, 230);
-    doc.line(margin, height - 42, width - margin, height - 42);
     doc.setFont("LiberationSans", "normal");
     doc.setTextColor(86);
     doc.setFontSize(7);
-    doc.text(
-      "Buyer-prepared reconciliation. Not a seller-issued invoice.",
-      margin,
-      height - 29,
-    );
     doc.text(
       `Page ${doc.getCurrentPageInfo().pageNumber}`,
       width - margin,
@@ -115,9 +93,9 @@ export async function createReconciledPdf(
   const after = () =>
     (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
   autoTable(doc, {
-    startY: 94,
+    startY: margin,
     theme: "grid",
-    margin: { left: margin, right: margin, top: 94, bottom: 55 },
+    margin: { left: margin, right: margin, top: margin, bottom: 55 },
     styles: {
       font: "LiberationSans",
       fontSize: 8,
@@ -138,7 +116,7 @@ export async function createReconciledPdf(
   autoTable(doc, {
     startY: after(),
     theme: "grid",
-    margin: { left: margin, right: margin, top: 94, bottom: 55 },
+    margin: { left: margin, right: margin, top: margin, bottom: 55 },
     styles: {
       font: "LiberationSans",
       fontSize: 8,
@@ -174,7 +152,7 @@ export async function createReconciledPdf(
     new Set(invoice.items.map((i) => i.seller).filter(Boolean)).size > 1;
   autoTable(doc, {
     startY: after() + 18,
-    margin: { top: 96, left: margin, right: margin, bottom: 55 },
+    margin: { top: margin, left: margin, right: margin, bottom: 55 },
     head: [["ITEMS", "DETAILS", "PRICE", "QUANTITY"]],
     body: invoice.items.map((i) => [
       normal([i.description, i.setName].filter(Boolean).join("\n")),
@@ -218,7 +196,7 @@ export async function createReconciledPdf(
   });
   autoTable(doc, {
     startY: after() + 10,
-    margin: { left: width - margin - 236, right: margin, top: 96, bottom: 55 },
+    margin: { left: width - margin - 236, right: margin, top: margin, bottom: 55 },
     theme: "plain",
     styles: {
       font: "LiberationSans",
@@ -236,7 +214,7 @@ export async function createReconciledPdf(
   if (invoice.notes.trim())
     autoTable(doc, {
       startY: after() + 20,
-      margin: { left: margin, right: margin, top: 96, bottom: 55 },
+      margin: { left: margin, right: margin, top: margin, bottom: 55 },
       head: [["RECONCILIATION NOTES"]],
       body: [[normal(invoice.notes)]],
       theme: "plain",
@@ -245,7 +223,6 @@ export async function createReconciledPdf(
     });
   for (let page = 1; page <= doc.getNumberOfPages(); page++) {
     doc.setPage(page);
-    header();
     footer();
   }
   return doc;
