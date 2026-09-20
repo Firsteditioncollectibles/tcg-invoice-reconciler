@@ -196,7 +196,12 @@ export async function createReconciledPdf(
   });
   autoTable(doc, {
     startY: after() + 10,
-    margin: { left: width - margin - 236, right: margin, top: margin, bottom: 55 },
+    margin: {
+      left: width - margin - 236,
+      right: margin,
+      top: margin,
+      bottom: 55,
+    },
     theme: "plain",
     styles: {
       font: "LiberationSans",
@@ -218,6 +223,7 @@ export async function createReconciledPdf(
       head: [["RECONCILIATION NOTES"]],
       body: [[normal(invoice.notes)]],
       theme: "plain",
+      pageBreak: "avoid",
       styles: { font: "LiberationSans", fontSize: 9, cellPadding: 5 },
       headStyles: { textColor: [20, 44, 74] },
     });

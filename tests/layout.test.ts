@@ -42,6 +42,20 @@ test("an unreadable quantity stays empty and blocks export instead of inventing 
   assert.equal(totals(doc).valid, false);
   assert.ok(doc.warnings.some((w) => w.includes("quantity could not be read")));
 });
+test("an unreadable price preserves its own editable row without swallowing neighbouring cards", () => {
+  const p = page();
+  p.boxes = p.boxes.filter(
+    (b) => !(b.x > 1030 && b.x < 1200 && b.y > 650 && b.y < 730),
+  );
+  const doc = parseOrder("Synthetic source", "fixture.png", [p]);
+  assert.equal(doc.items.length, 13);
+  assert.equal(doc.items[2].description, "Bulbasaur 001/165");
+  assert.equal(doc.items[2].unitPrice, "");
+  assert.equal(doc.items[1].setName, "Synthetic Test Set");
+  assert.equal(doc.items[3].description, "Squirtle 007/165");
+  assert.equal(totals(doc).valid, false);
+  assert.ok(doc.warnings.some((w) => w.includes("price could not be read")));
+});
 test("different sets and rarities are not consolidated, and old drafts migrate", () => {
   const doc = parseOrder("Synthetic source", "fixture.pdf", [page()]);
   const a = doc.items[0];

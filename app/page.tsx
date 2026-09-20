@@ -1,11 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import {
-  cents,
   consolidate,
   DISCLOSURE,
   emptyInvoice,
-  money,
+  editDocumentField,
   readDraft,
   totals,
   type Invoice,
@@ -14,6 +13,7 @@ import {
 import { parseOrder } from "../lib/parser";
 import { extractFile } from "../lib/extract";
 import DocumentEditor from "./document-editor";
+import PdfPreview from "./pdf-preview";
 
 const SAMPLE = `TCGplayer\nOrder Number: SAMPLE-123456\nOrder Date: September 19, 2026\nSeller: Example Cards\nShip To:\nSample Buyer\n123 Example Road\nExample City, EX 12345\nQuantity Description Price Total\n2 Pikachu 025/165 Near Mint $1.25 $2.50\n1 Charizard ex 199/165 Near Mint Holofoil $10.00 $10.00\n1 Pikachu 025/165 Near Mint $1.25 $1.25\nSubtotal: $13.75\nShipping: $1.99\nSales Tax: $0.80\nOrder Total: $16.54`;
 function download(blob: Blob, name: string) {
@@ -36,7 +36,7 @@ export default function Home() {
   );
   const [paste, setPaste] = useState("");
   const [confirmed, setConfirmed] = useState(false);
-  const [preview, setPreview] = useState(false);
+  const [preview, setPreview] = useState<Uint8Array | null>(null);
   const [dirty, setDirty] = useState(false);
   const upload = useRef<HTMLInputElement>(null);
   const draftInput = useRef<HTMLInputElement>(null);
@@ -75,11 +75,12 @@ export default function Home() {
     setHistory((h) => [...h.slice(-29), doc]);
     setDoc(next);
     setConfirmed(false);
+    setPreview(null);
     setDirty(true);
     setError("");
   }
   function field(key: keyof Invoice, value: string) {
-    change({ ...doc, [key]: value });
+    change(editDocumentField(doc, key, value));
   }
   function row(id: string, key: keyof LineItem, value: string | boolean) {
     change({
@@ -101,7 +102,7 @@ export default function Home() {
     setConfirmed(false);
     setDirty(true);
     setError("");
-    setPreview(false);
+    setPreview(null);
     setPaste(next.sourceText);
   }
   function mayReplace() {
@@ -159,17 +160,28 @@ export default function Home() {
     setSource(null);
     setNotice("Text extracted. Review the order details and each line item.");
   }
-  async function exportPdf() {
+  async function exportPdf(showPreview = false) {
+    if (!canExport) return;
     setError("");
     setBusy(true);
     setProgress("Preparing your reconciled PDF…");
     try {
       const { createReconciledPdf, pdfFileName } = await import("../lib/pdf");
-      const pdf = await createReconciledPdf(doc);
-      download(pdf.output("blob"), pdfFileName(doc.orderNumber));
-      setNotice(
-        "Reconciled PDF downloaded. Save a draft too if you want to reopen the editable order.",
-      );
+      const bytes =
+        preview ??
+        new Uint8Array((await createReconciledPdf(doc)).output("arraybuffer"));
+      if (showPreview) {
+        setPreview(bytes);
+        setNotice("Preview ready. This is the PDF that will be downloaded.");
+      } else {
+        download(
+          new Blob([new Uint8Array(bytes).buffer], { type: "application/pdf" }),
+          pdfFileName(doc.orderNumber),
+        );
+        setNotice(
+          "Reconciled PDF downloaded. Save a draft too if you want to reopen the editable order.",
+        );
+      }
     } catch (e) {
       setError(
         e instanceof Error
@@ -396,6 +408,7 @@ export default function Home() {
                   setDoc(last);
                   setHistory((h) => h.slice(0, -1));
                   setConfirmed(false);
+                  setPreview(null);
                   setDirty(true);
                 }
               }}
@@ -493,8 +506,10 @@ export default function Home() {
               <div className="export-actions">
                 <button
                   className="secondary"
-                  disabled={busy || !doc.items.length}
-                  onClick={() => setPreview(!preview)}
+                  disabled={busy || !canExport}
+                  onClick={() =>
+                    preview ? setPreview(null) : void exportPdf(true)
+                  }
                 >
                   {preview ? "Hide preview" : "Preview document"}
                 </button>
@@ -506,94 +521,7 @@ export default function Home() {
                 </button>
               </div>
             </section>
-            {preview && (
-              <section
-                className="document-preview"
-                aria-label="Reconciled document preview"
-              >
-                <div className="preview-metadata">
-                  <p>
-                    <strong>Order:</strong> {doc.orderNumber}
-                    <br />
-                    <strong>Date:</strong> {doc.orderDate}
-                    <br />
-                    <strong>Seller:</strong> {doc.seller}
-                  </p>
-                  <p>
-                    <strong>Recipient:</strong> {doc.recipient}
-                    <br />
-                    {doc.address}
-                    <br />
-                    <strong>Package:</strong> {doc.reference}
-                    <br />
-                    <strong>Tracking:</strong> {doc.tracking}
-                    <br />
-                    <strong>Bill to:</strong> {doc.billingRecipient}
-                    <br />
-                    {doc.billingAddress}
-                  </p>
-                </div>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Qty</th>
-                      <th>Description / condition</th>
-                      <th>Unit price</th>
-                      <th>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {doc.items.map((i) => (
-                      <tr key={i.id}>
-                        <td>{i.quantity}</td>
-                        <td>
-                          {i.description}
-                          <small>{i.setName}</small>
-                          <small>{i.rarity}</small>
-                          <small>
-                            {i.details}
-                            {i.seller ? ` · ${i.seller}` : ""}
-                          </small>
-                        </td>
-                        <td>
-                          {cents(i.unitPrice) !== null
-                            ? money(cents(i.unitPrice)!)
-                            : "—"}
-                        </td>
-                        <td>
-                          {cents(i.unitPrice) !== null
-                            ? money(cents(i.unitPrice)! * Number(i.quantity))
-                            : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <dl className="preview-totals">
-                  <div>
-                    <dt>Item subtotal</dt>
-                    <dd>{money(t.subtotal)}</dd>
-                  </div>
-                  <div>
-                    <dt>Shipping</dt>
-                    <dd>{money(t.shipping ?? 0)}</dd>
-                  </div>
-                  <div>
-                    <dt>Tax</dt>
-                    <dd>{money(t.tax ?? 0)}</dd>
-                  </div>
-                  <div>
-                    <dt>Discount</dt>
-                    <dd>−{money(t.discount ?? 0)}</dd>
-                  </div>
-                  <div>
-                    <dt>Reconciled total (USD)</dt>
-                    <dd>{t.valid ? money(t.total) : "Invalid amounts"}</dd>
-                  </div>
-                </dl>
-                {doc.notes && <p className="preview-notes">{doc.notes}</p>}
-              </section>
-            )}
+            {preview && <PdfPreview bytes={preview} />}
           </>
         ) : (
           <section className="empty-state">

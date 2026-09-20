@@ -3,6 +3,19 @@
 Status: V1.1 document-box editing is implemented and locally verified, ready to replace V1 at https://tcg-invoice-reconciler.vercel.app/. Code remains on `feat/tcgplayer-reconciler-v1`.
 Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
 
+## 20 September QA pass — edit every field in the supplied order
+
+- User requested complete debugging and easy editing of every field, using the supplied TCGplayer document as the reference. The available original is a screenshot; a temporary image-only PDF was made from that screenshot for the private scanned-PDF test. Neither original nor derived customer records are committed.
+- Reproduced and fixed a missing-price bug: the old marketplace parser returned 12 rows after one of 13 prices was made unreadable. Row grouping now uses printed rarity/condition labels as well as prices, preserving the row with a blank price and blocking export until corrected. Isolated quantity OCR uses those same row boundaries.
+- Reproduced and fixed a mixed-PDF bug: a selectable summary plus a scanned card table returned no rows because text length and a money amount suppressed OCR. Native text must now yield a usable item row; otherwise the page is scanned. A runtime-generated synthetic mixed PDF guards this case.
+- Editing the order seller updates the matching line sellers and their review state while preserving independently different row sellers. Added a stable accessible name for notes when reopening a saved draft.
+- Replaced the approximate HTML preview with a rendered preview of the actual export bytes, including previous/next page controls. Edits, undo and replacement clear the old preview and confirmation. PDF.js receives a copied buffer so preview rendering cannot detach the download data.
+- Export checks now read text from the actual downloaded PDFs. Every metadata/card field, row addition/deletion, recalculated charges, retained quantities, per-row sellers, draft reopening, removal of stale content, and absence of the removed title/disclaimer blocks are asserted. PDF preparation failures preserve edits and allow retry. Notes headings stay with their text across page breaks.
+- Final validation: `npm run check` passed (typecheck, **19/19 unit/PDF tests**, production build); **13/13 browser workflows passed in 55.9s**; **2/2 private source workflows passed in 26.0s**. Both the screenshot and the scanned PDF extracted 13 lines, 21 cards and $75.85 before edits, then passed the complete field-edit/export/draft round-trip. No runtime page errors were observed in those editing workflows.
+- Visually inspected the actual PDF preview and both pages of the synthetic fully edited export. Verified page margins and notes pagination. New evidence: `docs/evidence/all-fields-edited.pdf` (synthetic data). Private regression files remain under ignored `tmp/`.
+- React review: scanner/PDF libraries remain dynamically loaded; preview cancellation destroys its loading/render tasks; state invalidation happens in edit actions; controls retain accessible names. GitHub Actions continues to enforce build/unit/browser checks and retain synthetic failure screenshots/traces.
+- Prior clean-layout commit `160b2e6894c238ca7d96ff4e3eaba609f9553038` passed GitHub Actions run `35510971108`. This QA update is not deployed. The existing repository-only Vercel connection approval is still unanswered; do not claim the live V1 has these changes.
+
 ## 20 September follow-up — clean PDF layout
 
 - The user supplied cropped PDF header/footer screenshots and explicitly said "dont need any of this". Removed the large TCGplayer title, shipment-document subtitle and printed buyer-prepared disclaimer blocks, including the corresponding preview heading. PDFs now begin with order boxes at the normal top margin; continuation pages keep table headings and page numbers.
@@ -35,7 +48,7 @@ Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
 - Integer-cent totals and validation; invalid values never silently become zero.
 - Reviewed-row state and final confirmation; meaningful edits reset confirmation.
 - JSON draft download/reopen, unsaved-changes warning, cancellation and failure recovery.
-- Direct PDF download with embedded fonts, repeat table headings, long-order pagination and buyer-prepared disclosure on every page.
+- Direct PDF download with embedded fonts, repeat table headings, long-order pagination and reconciliation metadata; the printed disclosure blocks were removed by explicit user request.
 - Responsive editor, source pane and document preview.
 - Reproducible dependencies, same-origin scanner assets and CI workflow; no API keys or database.
 

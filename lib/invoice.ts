@@ -168,6 +168,22 @@ export function consolidate(items: LineItem[]): LineItem[] {
   }
   return result;
 }
+export function editDocumentField(
+  invoice: Invoice,
+  key: keyof Invoice,
+  value: string,
+): Invoice {
+  const next = { ...invoice, [key]: value };
+  if (key === "seller") {
+    const previous = invoice.seller.trim().toLowerCase();
+    next.items = invoice.items.map((item) =>
+      item.seller.trim().toLowerCase() === previous
+        ? { ...item, seller: value, reviewed: false }
+        : item,
+    );
+  }
+  return next;
+}
 export function readDraft(raw: string): Invoice {
   if (raw.length > 2_000_000)
     throw new Error("Draft is too large (maximum 2 MB).");

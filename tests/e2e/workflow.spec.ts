@@ -1,5 +1,40 @@
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { editEveryField } from "./edit-document";
+import { pdfPages } from "../pdf-content";
+import { jsPDF } from "jspdf";
+
+test("a PDF with selectable summary text still scans the image-only card table", async ({
+  page,
+}) => {
+  const pdf = new jsPDF({ unit: "pt", format: [1428, 1690], compress: true });
+  pdf.setFontSize(18);
+  pdf.text(
+    "TCGplayer purchase record with an attached scanned item table",
+    30,
+    25,
+  );
+  pdf.text("Order Total: $75.85", 30, 48);
+  pdf.addImage(
+    new Uint8Array(await readFile("tests/fixtures/marketplace-screenshot.png")),
+    "PNG",
+    0,
+    64,
+    1428,
+    1626,
+  );
+  await page.goto("/");
+  await page.getByLabel("Upload TCGplayer screenshot or PDF").setInputFiles({
+    name: "hybrid-marketplace.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from(pdf.output("arraybuffer")),
+  });
+  await expect(page.getByRole("row", { name: /^Line \d+$/ })).toHaveCount(13, {
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId("grand-total")).toHaveText("$75.85");
+  await expect(page.getByTestId("card-count")).toHaveText("21");
+});
 test("editor, consolidation, deletion, accurate totals, draft round-trip, and PDF download", async ({
   page,
 }, info) => {
@@ -36,9 +71,10 @@ test("editor, consolidation, deletion, accurate totals, draft round-trip, and PD
   await page.getByRole("button", { name: "I checked every line" }).click();
   await page.getByLabel("I checked the order details").check();
   await page.getByRole("button", { name: "Preview document" }).click();
-  await expect(page.getByLabel("Reconciled document preview")).toContainText(
-    "$2.98",
-  );
+  await expect(
+    page.getByLabel("Reconciled document preview").getByRole("status"),
+  ).toHaveText("Page 1 of 1");
+  await expect(page.getByLabel("PDF page 1", { exact: true })).toBeVisible();
   await page.screenshot({
     path: info.outputPath("reconciler-desktop.png"),
     fullPage: true,
@@ -55,6 +91,11 @@ test("editor, consolidation, deletion, accurate totals, draft round-trip, and PD
       .subarray(0, 4)
       .toString(),
   ).toBe("%PDF");
+  const exportedText = (
+    await pdfPages(await readFile(info.outputPath("reconciled.pdf")))
+  ).join(" ");
+  expect(exportedText).toContain("$2.98");
+  expect(exportedText).not.toContain("Charizard");
   const draftWait = page.waitForEvent("download");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   const draft = await draftWait;
@@ -76,6 +117,16 @@ test("editor, consolidation, deletion, accurate totals, draft round-trip, and PD
     ),
   ).toBe(true);
   expect(errors).toEqual([]);
+});
+test("every marketplace box can be edited, previewed, exported and reopened", async ({
+  page,
+}, info) => {
+  await page.goto("/");
+  await page
+    .getByLabel("Upload TCGplayer screenshot or PDF")
+    .setInputFiles("tests/fixtures/marketplace-text.pdf");
+  await expect(page.getByTestId("grand-total")).toHaveText("$75.85");
+  await editEveryField(page, info);
 });
 for (const file of [
   "tcgplayer-text.pdf",
@@ -133,9 +184,40 @@ test("bad file is actionable and does not destroy current edits", async ({
     mimeType: "application/pdf",
     buffer: Buffer.from("not a PDF"),
   });
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.locator(".message.error")).toBeVisible();
   await expect(page.getByTestId("grand-total")).toHaveText("$16.54");
   await expect(page.getByRole("button", { name: "Choose file" })).toBeEnabled();
+});
+test("failed PDF preparation preserves edits and lets the user retry", async ({
+  page,
+}, info) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Try an example" }).click();
+  await page
+    .getByLabel("Billing recipient", { exact: true })
+    .fill("Saved Buyer");
+  await page.getByRole("button", { name: "I checked every line" }).click();
+  await page.getByLabel("I checked the order details").check();
+  await page.route("**/vendor/standard_fonts/*.ttf", (route) =>
+    route.fulfill({ status: 404, body: "Missing test font" }),
+  );
+  await page.getByRole("button", { name: "Preview document" }).click();
+  await expect(page.locator(".message.error")).toContainText(
+    "Could not load the PDF font",
+  );
+  await expect(
+    page.getByLabel("Billing recipient", { exact: true }),
+  ).toHaveValue("Saved Buyer");
+  await expect(page.getByTestId("grand-total")).toHaveText("$16.54");
+  const exportButton = page.getByRole("button", {
+    name: "Download reconciled PDF",
+  });
+  await expect(exportButton).toBeEnabled();
+  await page.unroute("**/vendor/standard_fonts/*.ttf");
+  const wait = page.waitForEvent("download");
+  await exportButton.click();
+  await (await wait).saveAs(info.outputPath("retry-success.pdf"));
+  await expect(page.locator(".message.error")).toHaveCount(0);
 });
 test("cancelling an import during OCR initialization restores a usable editor", async ({
   page,

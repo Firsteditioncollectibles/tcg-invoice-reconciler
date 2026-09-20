@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createReconciledPdf, pdfFileName } from "../lib/pdf";
 import { parseOrder } from "../lib/parser";
 import { writeFile, mkdir, readFile } from "node:fs/promises";
+import { pdfPages } from "./pdf-content";
 const fonts = async () => ({
   regular: await readFile(
     "node_modules/pdfjs-dist/standard_fonts/LiberationSans-Regular.ttf",
@@ -26,6 +27,13 @@ test("PDF retains reconciliation metadata and filename", async () => {
   assert.match(raw, /Buyer-prepared reconciliation/);
   assert.match(raw, /Not a seller-issued invoice/);
   assert.equal(pdfFileName("../test"), "reconciled-tcgplayer----test.pdf");
+  const [text] = await pdfPages(new Uint8Array(pdf.output("arraybuffer")));
+  assert.match(text, /EXAMPLE-001/);
+  assert.match(text, /\$2.50/);
+  assert.doesNotMatch(
+    text,
+    /Buyer-prepared|Not a seller-issued|TCGplayer order|RECONCILED SHIPMENT DOCUMENT/,
+  );
   await mkdir("tmp/pdfs", { recursive: true });
   await writeFile(
     "tmp/pdfs/reconciled-example.pdf",
@@ -41,6 +49,17 @@ test("long orders paginate with wrapped descriptions", async () => {
   }));
   const pdf = await createReconciledPdf(d, await fonts());
   assert.ok(pdf.getNumberOfPages() >= 4);
+  const pages = await pdfPages(new Uint8Array(pdf.output("arraybuffer")));
+  pages.forEach((text, index) => {
+    assert.match(text, /ITEMS DETAILS PRICE QUANTITY/);
+    assert.ok(text.includes(`Page ${index + 1}`));
+    assert.doesNotMatch(
+      text,
+      /Buyer-prepared|Not a seller-issued|RECONCILED SHIPMENT DOCUMENT/,
+    );
+  });
+  assert.match(pages.at(-1)!, /Card 100/);
+  assert.match(pages.at(-1)!, /\$250.00/);
   await mkdir("tmp/pdfs", { recursive: true });
   await writeFile(
     "tmp/pdfs/reconciled-100-lines.pdf",

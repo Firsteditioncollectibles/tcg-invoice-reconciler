@@ -118,6 +118,69 @@ export function marketplacePrices(
   });
 }
 
+// Printed rarity/condition labels also identify rows when OCR misses a price.
+// Never let two neighbouring cards collapse into one because a price is blank.
+export function marketplaceRows(
+  page: TextPage,
+  table: NonNullable<ReturnType<typeof marketplaceTable>>,
+) {
+  const prices = marketplacePrices(page, table);
+  const details = layoutLines(
+    region(page, table.details, table.price, table.top, page.height),
+  );
+  const rarity = details.filter((b) => /^Rarity\s*:/i.test(b.text));
+  const condition = details.filter((b) => /^Condition\s*:/i.test(b.text));
+  const labels = rarity.length >= condition.length ? rarity : condition;
+  const bounds = (anchors: TextBox[]) =>
+    anchors.map((anchor, index) => ({
+      anchor,
+      top: index
+        ? (middle(anchors[index - 1]) + middle(anchor)) / 2
+        : table.top,
+      bottom:
+        index + 1 < anchors.length
+          ? (middle(anchor) + middle(anchors[index + 1])) / 2
+          : Math.min(
+              page.height,
+              middle(anchor) +
+                (index
+                  ? (middle(anchor) - middle(anchors[index - 1])) / 2
+                  : table.height * 4),
+            ),
+    }));
+  const labelled = bounds(labels);
+  const useLabels =
+    labels.length > 0 &&
+    labels.length >= prices.length &&
+    labelled.every(
+      (r) =>
+        prices.filter((p) => middle(p) > r.top && middle(p) < r.bottom)
+          .length <= 1,
+    ) &&
+    prices.every((p) =>
+      labelled.some((r) => middle(p) > r.top && middle(p) < r.bottom),
+    );
+  return (useLabels ? labelled : bounds(prices)).map(
+    ({ anchor, top, bottom }) => {
+      const price = prices.find((p) => middle(p) > top && middle(p) < bottom);
+      const rowDetails = details.filter(
+        (b) => middle(b) > top && middle(b) < bottom,
+      );
+      return {
+        top,
+        bottom,
+        price,
+        center: price
+          ? middle(price)
+          : rowDetails.length
+            ? (middle(rowDetails[0]) + middle(rowDetails.at(-1)!)) / 2
+            : middle(anchor),
+        height: price?.height ?? anchor.height,
+      };
+    },
+  );
+}
+
 /** Read the marketplace order grid by column/row geometry, never by flattened text order. */
 export function parseMarketplaceLayout(pages: TextPage[]): Invoice | null {
   if (!pages.some((p) => marketplaceTable(p))) return null;
@@ -216,21 +279,7 @@ export function parseMarketplaceLayout(pages: TextPage[]): Invoice | null {
         else doc.tax = decimal(value);
       }
     }
-    const prices = marketplacePrices(page, table);
-    prices.forEach((price, index) => {
-      const top = index
-        ? (middle(prices[index - 1]) + middle(price)) / 2
-        : table.top;
-      const bottom =
-        index + 1 < prices.length
-          ? (middle(price) + middle(prices[index + 1])) / 2
-          : Math.min(
-              page.height,
-              middle(price) +
-                (index
-                  ? (middle(price) - middle(prices[index - 1])) / 2
-                  : table.height * 4),
-            );
+    marketplaceRows(page, table).forEach(({ price, top, bottom }) => {
       const itemLines = layoutLines(
         region(page, table.left, table.details, top, bottom),
       )
@@ -259,7 +308,7 @@ export function parseMarketplaceLayout(pages: TextPage[]): Invoice | null {
         /^(Subtotal|Shipping|Tax|Total)\b/i.test(itemLines[0])
       ) {
         doc.warnings.push(
-          `Page ${pageIndex + 1}: unmatched price ${decimal(price.value)}. Check for a missing item.`,
+          `Page ${pageIndex + 1}: unmatched item row${price ? ` at ${decimal(price.value)}` : ""}. Check for a missing item.`,
         );
         return;
       }
@@ -271,11 +320,11 @@ export function parseMarketplaceLayout(pages: TextPage[]): Invoice | null {
         details: condition,
         seller: doc.seller,
         quantity: q,
-        unitPrice: decimal(price.value),
+        unitPrice: price ? decimal(price.value) : "",
         sourceText: [
           ...itemLines,
           ...detailLines,
-          `Price: ${decimal(price.value)}`,
+          `Price: ${price ? decimal(price.value) : "unreadable"}`,
           `Quantity: ${q || "unreadable"}`,
         ].join("\n"),
         reviewed: false,
@@ -283,6 +332,10 @@ export function parseMarketplaceLayout(pages: TextPage[]): Invoice | null {
       if (!q)
         doc.warnings.push(
           `Line ${doc.items.length}: quantity could not be read. Enter it from the source.`,
+        );
+      if (!price)
+        doc.warnings.push(
+          `Line ${doc.items.length}: price could not be read. Enter it from the source.`,
         );
     });
   }

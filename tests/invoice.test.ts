@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   cents,
+  editDocumentField,
   consolidate,
   emptyInvoice,
   readDraft,
@@ -89,6 +90,22 @@ test("consolidation preserves cents, variants and seller boundaries without muta
     totals({ ...emptyInvoice(), items }).total,
     totals({ ...emptyInvoice(), items: merged }).total,
   );
+});
+test("editing the order seller updates matching rows and preserves a different row seller", () => {
+  const doc = {
+    ...emptyInvoice(),
+    seller: "Example Cards",
+    items: [
+      line({ reviewed: true }),
+      line({ id: "2", seller: "Another Seller", reviewed: true }),
+    ],
+  };
+  const edited = editDocumentField(doc, "seller", "Corrected Store");
+  assert.equal(edited.items[0].seller, "Corrected Store");
+  assert.equal(edited.items[0].reviewed, false);
+  assert.equal(edited.items[1].seller, "Another Seller");
+  assert.equal(edited.items[1].reviewed, true);
+  assert.equal(doc.items[0].seller, "Example Cards");
 });
 test("extracts TCGplayer metadata, conditions, card numbers, quantities and totals", () => {
   const doc = parseOrder(RECEIPT);

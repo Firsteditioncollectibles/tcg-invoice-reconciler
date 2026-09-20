@@ -737,51 +737,22 @@ dd {
   margin: 30px auto;
   box-shadow: 0 4px 20px #1729420a;
 }
-.preview-metadata {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 25px;
-  font-size: 12px;
-  white-space: pre-line;
-  margin: 20px 0;
-}
-.document-preview table {
+.document-preview canvas {
   width: 100%;
-  border-collapse: collapse;
+  height: auto;
+}
+.pdf-preview-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.pdf-preview-controls p {
   font-size: 12px;
+  text-align: center;
 }
-.document-preview th {
-  background: var(--navy);
-  color: white;
-  text-align: left;
-  font-size: 10px;
-  padding: 11px;
-}
-.document-preview td {
-  padding: 12px 11px;
-  border: 1px solid var(--border);
-}
-.document-preview td small {
-  display: block;
-  font-size: 10px;
-  color: var(--muted);
-}
-.document-preview tbody tr:nth-child(even) {
-  background: #f7f9fc;
-}
-.preview-totals {
-  max-width: 300px;
-  margin: 25px 0 25px auto;
-}
-.preview-totals > div:last-child {
-  background: #eef3fa;
-  padding: 12px;
-}
-.preview-notes {
-  font-size: 12px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -1001,17 +972,6 @@ input.sr-only {
     padding: 20px 12px;
     overflow-x: auto;
   }
-  .document-preview td,
-  .document-preview th {
-    padding: 8px 5px;
-  }
-  .preview-metadata {
-    font-size: 10px;
-    gap: 10px;
-  }
-  .document-preview table {
-    font-size: 10px;
-  }
   .row-review details {
     max-width: 52%;
   }
@@ -1038,11 +998,8 @@ input.sr-only {
   main {
     padding: 0;
   }
-  .document-preview tr {
-    break-inside: avoid;
-  }
-  .document-preview thead {
-    display: table-header-group;
+  .pdf-preview-controls {
+    display: none;
   }
 }
 /* Editable order document: every box is the real input, not a decorative preview. */
@@ -1203,10 +1160,9 @@ input.sr-only {
 .paper-table-head,
 .paper-line {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1.5fr) minmax(
-      90px,
-      0.55fr
-    ) minmax(85px, 0.5fr);
+  grid-template-columns:
+    minmax(0, 1.55fr) minmax(0, 1.5fr) minmax(90px, 0.55fr)
+    minmax(85px, 0.5fr);
 }
 .paper-table-head {
   background: #ededed;

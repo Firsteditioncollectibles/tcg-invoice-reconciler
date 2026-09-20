@@ -348,6 +348,7 @@ export default function DocumentEditor({
         <label className="field notes">
           <span>Reconciliation notes</span>
           <textarea
+            aria-label="Reconciliation notes"
             value={doc.notes}
             onChange={(e) => field("notes", e.target.value)}
             placeholder="For example: removed one card missing from the package."

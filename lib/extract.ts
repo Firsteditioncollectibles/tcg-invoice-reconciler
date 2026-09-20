@@ -1,5 +1,7 @@
 import type { Worker, Page } from "tesseract.js";
-import { marketplaceTable, marketplacePrices, type TextPage } from "./layout";
+import { marketplaceTable, marketplaceRows, type TextPage } from "./layout";
+import { parseOrder } from "./parser";
+import { cents, quantity } from "./invoice";
 export type Extraction = {
   text: string;
   pages: number;
@@ -164,18 +166,18 @@ export async function extractFile(
     if (table) {
       // Thin table rules and isolated "1" digits defeat whole-page OCR. Read each
       // quantity cell separately, using the matching price's vertical position.
-      const prices = marketplacePrices(layout, table);
+      const rows = marketplaceRows(layout, table);
       const { PSM } = await import("tesseract.js");
       await worker.setParameters({
         tessedit_pageseg_mode: PSM.SINGLE_LINE,
         tessedit_char_whitelist: "0123456789",
       });
       const quantities: TextPage["boxes"] = [];
-      for (const [index, price] of prices.entries()) {
+      for (const [index, row] of rows.entries()) {
         check();
-        onProgress(`Reading quantity ${index + 1} of ${prices.length}…`);
-        const center = price.y + price.height / 2;
-        const radius = Math.max(price.height, table.height) * 1.2;
+        onProgress(`Reading quantity ${index + 1} of ${rows.length}…`);
+        const center = row.center;
+        const radius = Math.max(row.height, table.height) * 1.2;
         const top = Math.max(0, Math.floor(center - radius));
         const left = Math.max(0, Math.floor(table.qty + table.height * 0.3));
         const cell = await Promise.race([
@@ -198,9 +200,9 @@ export async function extractFile(
           quantities.push({
             text: value,
             x: left,
-            y: center - price.height / 2,
+            y: center - row.height / 2,
             width: table.height,
-            height: price.height,
+            height: row.height,
           });
       }
       layout.boxes = [
@@ -250,29 +252,36 @@ export async function extractFile(
             (i): i is PositionedText & typeof i => "str" in i,
           ),
         );
-        // Text-only headers on otherwise scanned pages must not suppress OCR of the card table.
-        if (text.replace(/\s/g, "").length >= 50 && /\d[.,]\d{2}/.test(text)) {
+        const viewport = page.getViewport({ scale: 1 });
+        const textLayout: TextPage = {
+          width: viewport.width,
+          height: viewport.height,
+          boxes: content.items
+            .filter((i): i is PositionedText & typeof i => "str" in i)
+            .map((i) => {
+              const transform = pdfjs.Util.transform(
+                viewport.transform,
+                i.transform,
+              );
+              return {
+                text: i.str,
+                x: transform[4],
+                y: transform[5] - i.height,
+                width: i.width,
+                height: i.height,
+              };
+            }),
+        };
+        // A selectable summary (even one containing totals) does not establish
+        // that the card table is text. Require at least one usable native row.
+        const nativeRows = parseOrder(text, file.name, [textLayout]).items;
+        if (
+          nativeRows.some(
+            (i) => cents(i.unitPrice) !== null && quantity(i.quantity) !== null,
+          )
+        ) {
           texts.push(text);
-          const viewport = page.getViewport({ scale: 1 });
-          layout.push({
-            width: viewport.width,
-            height: viewport.height,
-            boxes: content.items
-              .filter((i): i is PositionedText & typeof i => "str" in i)
-              .map((i) => {
-                const transform = pdfjs.Util.transform(
-                  viewport.transform,
-                  i.transform,
-                );
-                return {
-                  text: i.str,
-                  x: transform[4],
-                  y: transform[5] - i.height,
-                  width: i.width,
-                  height: i.height,
-                };
-              }),
-          });
+          layout.push(textLayout);
         } else {
           const natural = page.getViewport({ scale: 1 });
           const scale = Math.min(
