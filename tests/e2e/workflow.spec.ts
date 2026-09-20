@@ -269,6 +269,11 @@ for (const file of [
     await expect(page.getByTestId("grand-total")).toHaveText("$75.85");
     await expect(page.getByTestId("card-count")).toHaveText("21");
     await expect(page.locator(".source-drawing image")).toHaveCount(13);
+    const backs = await page
+      .locator(".source-drawing image")
+      .evaluateAll((images) => images.map((im) => im.getAttribute("href")));
+    expect(new Set(backs).size).toBe(1);
+    expect(backs[0]).toMatch(/^data:image\/jpeg;base64,/);
     await expect(
       page.getByLabel("Order number *", { exact: true }),
     ).toHaveValue("SYNTHETIC-001-TEST");

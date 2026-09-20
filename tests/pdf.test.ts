@@ -89,9 +89,12 @@ test("export keeps the supplied marketplace geometry without added boxes or foot
   const d = parseOrder("Synthetic source", "fixture.pdf", [layout]);
   d.items.forEach((i) => {
     i.reviewed = true;
+    i.thumbnail =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK1sAAAAASUVORK5CYII=";
   });
   d.shippingMethod = "Standard (est.delivery by\nSeptember 28, 2026) - $1.48";
   const exported = await createReconciledPdf(d, await fonts());
+  assert.match(exported.output(), /\/Subtype\s*\/Image/);
   const task = getDocument({
     data: new Uint8Array(exported.output("arraybuffer")),
   });

@@ -1,3 +1,4 @@
+import { CARD_BACK } from "./card-back";
 import { cents, money, totals, type Invoice, type LineItem } from "./invoice";
 
 // Coordinates are measured from the user's 1436px TCGplayer order screenshot.
@@ -400,14 +401,13 @@ export function orderSheets(
     box(29, y, 1372, height, index % 2 ? "#f9f9f9" : "#ffffff", RULE);
     for (const x of [519, 1023, 1210]) box(x, y, 2, height, RULE);
     s.rows.push({ id: item.id, index, top: y, height });
-    if (item.thumbnail)
-      s.images.push({
-        src: item.thumbnail,
-        x: 40,
-        y: y + 11,
-        width: 42,
-        height: 58,
-      });
+    s.images.push({
+      src: CARD_BACK,
+      x: 32,
+      y: y + 11,
+      width: 58,
+      height: 58,
+    });
     const itemField = (
       key: keyof LineItem,
       label: string,

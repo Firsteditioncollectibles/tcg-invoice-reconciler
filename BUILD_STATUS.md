@@ -3,6 +3,13 @@
 Status: V1.1 screenshot-matched editing/export is LIVE at https://tcg-invoice-reconciler.vercel.app/. Code remains on `feat/tcgplayer-reconciler-v1`.
 Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
 
+## Card-back artwork update — current
+
+- User clarified that every product thumbnail should be replaced by a small standard Pokémon card back, preserving the original row layout. Shared editor/PDF drawing now always uses the bundled JPEG, including rows without source artwork and reopened drafts. No runtime external image requests.
+- Image source and rights attribution are recorded in `lib/card-back.ts`. No customer data is included.
+- Local `npm run check` passed: 23 unit/PDF tests, typecheck, production build. PDF checks exercise replacement of existing source thumbnails; browser checks assert all 13 rows use the same bundled JPEG.
+- Local browser checks could not launch because the previous Chromium binary was empty and its package was unavailable. Run GitHub browser checks on a preview branch before updating the authorized production branch. Then verify the hosted editor and PDF preview. This update supersedes earlier requirements for original card thumbnails.
+
 ## 20 September publishing — current
 
 - The user approved the repository-only GitHub/Vercel connection and publication. Connected `Firsteditioncollectibles/tcg-invoice-reconciler` to the existing dedicated project `prj_biGutj7uN6aGN7BhHovBjUz7Gkzs` in team `team_5DQoS9LZQGvYBVK00CtKwcPJ`. No new project, environment variables, database or broader repository selection was added.
