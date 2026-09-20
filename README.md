@@ -2,7 +2,7 @@
 
 A standalone, TCGplayer-focused tool for turning an order screenshot or PDF into an editable **buyer-prepared reconciled shipment document**.
 
-Live V1: https://tcg-invoice-reconciler.vercel.app/
+Live V1.1: https://tcg-invoice-reconciler.vercel.app/
 
 The dedicated Vercel project is connected only to this repository. Production deployments track `feat/tcgplayer-reconciler-v1`; `main` is still the starter branch. See `BUILD_STATUS.md` for the verified project, tested application commit and publishing checkpoint.
 

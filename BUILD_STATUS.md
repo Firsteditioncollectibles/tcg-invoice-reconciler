@@ -1,6 +1,6 @@
 # V1.1 handover checkpoint — 20 September 2026
 
-Status: V1.1 screenshot-matched editing/export is implemented and locally verified, ready to replace V1 at https://tcg-invoice-reconciler.vercel.app/. Code remains on `feat/tcgplayer-reconciler-v1`.
+Status: V1.1 screenshot-matched editing/export is LIVE at https://tcg-invoice-reconciler.vercel.app/. Code remains on `feat/tcgplayer-reconciler-v1`.
 Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
 
 ## 20 September publishing — current
@@ -8,7 +8,10 @@ Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
 - The user approved the repository-only GitHub/Vercel connection and publication. Connected `Firsteditioncollectibles/tcg-invoice-reconciler` to the existing dedicated project `prj_biGutj7uN6aGN7BhHovBjUz7Gkzs` in team `team_5DQoS9LZQGvYBVK00CtKwcPJ`. No new project, environment variables, database or broader repository selection was added.
 - Production branch tracking is now `feat/tcgplayer-reconciler-v1`; the dashboard confirmed the setting was saved. Do not deploy the starter `main` branch. Pushes now trigger production builds. Default deployment protection remains unchanged.
 - Application commit `d3beae2ac4ad6316171c4c3e8b7233c51ff40056` passed the complete GitHub Actions workflow **35532241046**, including all 23 unit/PDF tests, production build and all 13 browser workflows.
-- This documentation-only push initiates the first Git-connected deployment of that exact application. Inspect its deployment status and perform hosted upload/edit/export verification before claiming the new version is live. The previous connection blocker in the historical entries below is resolved.
+- First Git-connected production deployment succeeded: `dpl_2EqxoLKtL3YJuNL2wWEx8UCv1usz`, commit `a0a5f0073b2508104f9b317c3b25264d45f005b4`, READY, source git, production alias `https://tcg-invoice-reconciler.vercel.app/`, build about 15.4 seconds. The application is identical to `d3beae2`; only handover documentation changed. GitHub Actions **35537616671** passed all checks on the deployment commit. The previous connection blocker in historical entries below is resolved.
+- Hosted checks passed with synthetic marketplace screenshot, native-text PDF and scanned PDF: each produced 13 rows and $75.85. The live screenshot editor retained 13 thumbnails. Changing a quantity from 4 to 2 recalculated $73.87; deleting the last row gave $72.12; undo restored $73.87. Billing/name/condition fields were edited in place. Export stayed disabled until review, and the actual PDF preview rendered Page 1 of 1. The live layout was visually inspected.
+- Verification limit: the live export action reported a successful download, but Cloud Browser's download-event capture timed out; the downloaded live file was not independently inspected. Actual PDF download/content verification passed in the full local and GitHub browser suites. Do not describe the live downloaded bytes as separately verified. The project runtime-error scan for the preceding hour returned no errors; browser-console errors observed were from the cloud-browser extension, not the app.
+- This follow-up changes deployment documentation only. Production tracks this branch, so its push may create another deployment with identical application files; verify READY before handing over.
 - The user said this will eventually become part of CardScout. No present integration was authorized or performed; the existing strict isolation boundary remains.
 
 ## 20 September exact-layout correction — current
@@ -86,7 +89,7 @@ Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
 - Hosted smoke tests: synthetic PNG screenshot OCR, native PDF extraction and scanned-PDF OCR each extracted Pikachu 025/165, quantity 2, and the correct $16.54 order total.
 - Hosted editing/export: consolidation produced quantity 3 without changing $16.54; deleting the other card produced $6.54; quantity/price/discount edits produced $2.98. Export was disabled until review. The downloaded one-page PDF contained $2.98, omitted the deleted card and retained the buyer-prepared / not seller-issued disclosure. Its rendered layout was visually checked. Evidence: `docs/evidence/reconciled-live-smoke.pdf`.
 
-## Standalone deployment
+## Original standalone deployment — historical V1
 
 - Live URL: https://tcg-invoice-reconciler.vercel.app/
 - Vercel project: `tcg-invoice-reconciler`, ID `prj_biGutj7uN6aGN7BhHovBjUz7Gkzs`.
