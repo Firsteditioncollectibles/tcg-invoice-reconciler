@@ -1,9 +1,11 @@
 import type { Worker, Page } from "tesseract.js";
+import { marketplaceTable, marketplacePrices, type TextPage } from "./layout";
 export type Extraction = {
   text: string;
   pages: number;
   method: string;
   warnings: string[];
+  layout: TextPage[];
 };
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 export const MAX_PAGES = 20;
@@ -46,20 +48,30 @@ export function textInReadingOrder(items: PositionedText[]): string {
     )
     .join("\n");
 }
-function ocrInReadingOrder(data: Page): string {
+export function ocrLayout(data: Page, width: number, height: number): TextPage {
   const words =
     data.blocks?.flatMap((b) =>
       b.paragraphs.flatMap((p) => p.lines.flatMap((l) => l.words)),
     ) ?? [];
-  if (!words.length) return data.text;
-  // OCR's automatic layout can read the entire description column before the price column.
-  // Rejoin words at their visual baseline to keep each card attached to its own price.
-  return textInReadingOrder(
-    words.map((w) => ({
-      str: w.text,
-      transform: [1, 0, 0, 1, w.bbox.x0, -(w.bbox.y0 + w.bbox.y1) / 2],
+  return {
+    width,
+    height,
+    boxes: words.map((w) => ({
+      text: w.text,
+      x: w.bbox.x0,
+      y: w.bbox.y0,
       width: w.bbox.x1 - w.bbox.x0,
       height: w.bbox.y1 - w.bbox.y0,
+    })),
+  };
+}
+function layoutText(page: TextPage) {
+  return textInReadingOrder(
+    page.boxes.map((b) => ({
+      str: b.text,
+      transform: [1, 0, 0, 1, b.x, -(b.y + b.height / 2)],
+      width: b.width,
+      height: b.height,
     })),
   );
 }
@@ -132,7 +144,7 @@ export async function extractFile(
       worker = await Promise.race([initialization, stopped]);
       check();
       await worker.setParameters({
-        tessedit_pageseg_mode: PSM.AUTO,
+        tessedit_pageseg_mode: PSM.SPARSE_TEXT,
         preserve_interword_spaces: "1",
       });
     }
@@ -147,7 +159,64 @@ export async function extractFile(
     ]);
     workerFailure = undefined;
     check();
-    return { ...result.data, text: ocrInReadingOrder(result.data) };
+    const layout = ocrLayout(result.data, image.width, image.height);
+    const table = marketplaceTable(layout);
+    if (table) {
+      // Thin table rules and isolated "1" digits defeat whole-page OCR. Read each
+      // quantity cell separately, using the matching price's vertical position.
+      const prices = marketplacePrices(layout, table);
+      const { PSM } = await import("tesseract.js");
+      await worker.setParameters({
+        tessedit_pageseg_mode: PSM.SINGLE_LINE,
+        tessedit_char_whitelist: "0123456789",
+      });
+      const quantities: TextPage["boxes"] = [];
+      for (const [index, price] of prices.entries()) {
+        check();
+        onProgress(`Reading quantity ${index + 1} of ${prices.length}…`);
+        const center = price.y + price.height / 2;
+        const radius = Math.max(price.height, table.height) * 1.2;
+        const top = Math.max(0, Math.floor(center - radius));
+        const left = Math.max(0, Math.floor(table.qty + table.height * 0.3));
+        const cell = await Promise.race([
+          worker.recognize(
+            image,
+            {
+              rectangle: {
+                left,
+                top,
+                width: Math.max(1, image.width - left - 8),
+                height: Math.min(image.height - top, Math.ceil(radius * 2)),
+              },
+            },
+            { text: true, blocks: true },
+          ),
+          stopped,
+        ]);
+        const value = cell.data.text.trim();
+        if (/^\d{1,4}$/.test(value))
+          quantities.push({
+            text: value,
+            x: left,
+            y: center - price.height / 2,
+            width: table.height,
+            height: price.height,
+          });
+      }
+      layout.boxes = [
+        ...layout.boxes.filter((b) => !(b.x >= table.qty && b.y > table.top)),
+        ...quantities,
+      ];
+      await worker.setParameters({
+        tessedit_pageseg_mode: PSM.SPARSE_TEXT,
+        tessedit_char_whitelist: "",
+      });
+    }
+    return {
+      ...result.data,
+      text: layout.boxes.length ? layoutText(layout) : result.data.text,
+      layout,
+    };
   };
   const warnings: string[] = [];
   try {
@@ -169,6 +238,7 @@ export async function extractFile(
           "Import up to 20 PDF pages at a time. Split this PDF into smaller files.",
         );
       const texts: string[] = [];
+      const layout: TextPage[] = [];
       let scanned = 0;
       for (let n = 1; n <= pdf.numPages; n++) {
         check();
@@ -181,9 +251,29 @@ export async function extractFile(
           ),
         );
         // Text-only headers on otherwise scanned pages must not suppress OCR of the card table.
-        if (text.replace(/\s/g, "").length >= 50 && /\d[.,]\d{2}/.test(text))
+        if (text.replace(/\s/g, "").length >= 50 && /\d[.,]\d{2}/.test(text)) {
           texts.push(text);
-        else {
+          const viewport = page.getViewport({ scale: 1 });
+          layout.push({
+            width: viewport.width,
+            height: viewport.height,
+            boxes: content.items
+              .filter((i): i is PositionedText & typeof i => "str" in i)
+              .map((i) => {
+                const transform = pdfjs.Util.transform(
+                  viewport.transform,
+                  i.transform,
+                );
+                return {
+                  text: i.str,
+                  x: transform[4],
+                  y: transform[5] - i.height,
+                  width: i.width,
+                  height: i.height,
+                };
+              }),
+          });
+        } else {
           const natural = page.getViewport({ scale: 1 });
           const scale = Math.min(
             2.5,
@@ -200,6 +290,7 @@ export async function extractFile(
           ]);
           const result = await ocr(canvas);
           texts.push(result.text);
+          layout.push(result.layout);
           scanned++;
           if (result.confidence < 80)
             warnings.push(
@@ -220,6 +311,7 @@ export async function extractFile(
         pages: pdf.numPages,
         method: scanned ? "PDF + OCR" : "PDF text",
         warnings,
+        layout,
       };
     }
     const bitmap = await createImageBitmap(file);
@@ -252,7 +344,13 @@ export async function extractFile(
       );
     if (result.confidence < 80)
       warnings.push("Low OCR confidence. Check every line against the source.");
-    return { text: result.text, pages: 1, method: "Image OCR", warnings };
+    return {
+      text: result.text,
+      pages: 1,
+      method: "Image OCR",
+      warnings,
+      layout: [result.layout],
+    };
   } finally {
     clearTimeout(timeout);
     signal.removeEventListener("abort", cancel);

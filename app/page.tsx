@@ -13,6 +13,7 @@ import {
 } from "../lib/invoice";
 import { parseOrder } from "../lib/parser";
 import { extractFile } from "../lib/extract";
+import DocumentEditor from "./document-editor";
 
 const SAMPLE = `TCGplayer\nOrder Number: SAMPLE-123456\nOrder Date: September 19, 2026\nSeller: Example Cards\nShip To:\nSample Buyer\n123 Example Road\nExample City, EX 12345\nQuantity Description Price Total\n2 Pikachu 025/165 Near Mint $1.25 $2.50\n1 Charizard ex 199/165 Near Mint Holofoil $10.00 $10.00\n1 Pikachu 025/165 Near Mint $1.25 $1.25\nSubtotal: $13.75\nShipping: $1.99\nSales Tax: $0.80\nOrder Total: $16.54`;
 function download(blob: Blob, name: string) {
@@ -121,7 +122,7 @@ export default function Home() {
     try {
       const result = await extractFile(file, setProgress, controller.signal);
       if (controller.signal.aborted) return;
-      const next = parseOrder(result.text, file.name);
+      const next = parseOrder(result.text, file.name, result.layout);
       next.warnings.push(...result.warnings);
       replace(next);
       setSource({
@@ -218,7 +219,7 @@ export default function Home() {
             <i />
             Processed on your device
           </span>
-          <span className="version">V1 · TCGplayer</span>
+          <span className="version">V1.1 · TCGplayer</span>
         </div>
       </header>
       <main>
@@ -227,8 +228,8 @@ export default function Home() {
             <p className="eyebrow">FROM ORDER TO RECEIVED CONTENTS</p>
             <h1>Your order. Reconciled.</h1>
             <p className="lead">
-              Scan your TCGplayer order, match what arrived, and export a clear
-              shipment document.
+              Upload your TCGplayer order, edit the boxes on your document, and
+              download the reconciled PDF.
             </p>
           </div>
           <div className="top-actions">
@@ -382,380 +383,69 @@ export default function Home() {
         </section>
         {doc.items.length > 0 || doc.sourceText ? (
           <>
-            <div className="workspace">
-              <section className="editor panel" aria-labelledby="review-title">
-                <div className="section-top">
-                  <div>
-                    <p className="eyebrow">02 / REVIEW & RECONCILE</p>
-                    <h2 id="review-title">Match what arrived</h2>
-                  </div>
-                  <button
-                    className="secondary small"
-                    disabled={!history.length || busy}
-                    onClick={() => {
-                      const last = history.at(-1);
-                      if (last) {
-                        setDoc(last);
-                        setHistory((h) => h.slice(0, -1));
-                        setConfirmed(false);
-                        setDirty(true);
-                      }
-                    }}
-                  >
-                    Undo
-                  </button>
-                </div>
-                <fieldset disabled={busy}>
-                  <legend className="sr-only">Order information</legend>
-                  <div className="metadata-grid">
-                    <label className="field">
-                      <span>
-                        Order number <b>*</b>
-                      </span>
-                      <input
-                        value={doc.orderNumber}
-                        onChange={(e) => field("orderNumber", e.target.value)}
-                        placeholder="TCGplayer order number"
-                        maxLength={100}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Order date</span>
-                      <input
-                        value={doc.orderDate}
-                        onChange={(e) => field("orderDate", e.target.value)}
-                        placeholder="As shown on the original"
-                        maxLength={100}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Seller / store</span>
-                      <input
-                        value={doc.seller}
-                        onChange={(e) => field("seller", e.target.value)}
-                        maxLength={200}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Recipient</span>
-                      <input
-                        value={doc.recipient}
-                        onChange={(e) => field("recipient", e.target.value)}
-                        maxLength={200}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Delivery address</span>
-                      <textarea
-                        value={doc.address}
-                        onChange={(e) => field("address", e.target.value)}
-                        rows={3}
-                        maxLength={800}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Shipment / package reference</span>
-                      <input
-                        value={doc.reference}
-                        onChange={(e) => field("reference", e.target.value)}
-                        placeholder="Optional package or suite reference"
-                        maxLength={200}
-                      />
-                    </label>
-                  </div>
-                  <div className="line-toolbar">
-                    <h3>
-                      Line items{" "}
-                      <span className="count">{doc.items.length}</span>
-                    </h3>
-                    <div>
-                      <button
-                        className="secondary small"
-                        onClick={() => {
-                          const merged = consolidate(doc.items);
-                          if (merged.length === doc.items.length) {
-                            setNotice(
-                              "No matching duplicates. Description, condition, seller and unit price must all match.",
-                            );
-                            return;
-                          }
-                          change({ ...doc, items: merged });
-                          setNotice(
-                            `${doc.items.length - merged.length} duplicate line(s) consolidated. Quantities and value preserved.`,
-                          );
-                        }}
-                      >
-                        Consolidate duplicates
-                      </button>
-                      <button
-                        className="secondary small"
-                        onClick={() =>
-                          change({
-                            ...doc,
-                            items: [
-                              ...doc.items,
-                              {
-                                id: crypto.randomUUID(),
-                                description: "",
-                                details: "",
-                                seller: doc.seller,
-                                quantity: "1",
-                                unitPrice: "",
-                                sourceText: "Manually added",
-                                reviewed: false,
-                              },
-                            ],
-                          })
-                        }
-                      >
-                        + Add line
-                      </button>
-                    </div>
-                  </div>
-                  <p className="helper">
-                    Edit quantities and prices, remove missing cards, then mark
-                    each line reviewed.
-                  </p>
-                  <div className="line-labels" aria-hidden="true">
-                    <span>DESCRIPTION / CONDITION</span>
-                    <span>QTY</span>
-                    <span>UNIT PRICE</span>
-                    <span>TOTAL</span>
-                    <span />
-                  </div>
-                  <div className="line-list">
-                    {doc.items.map((item, index) => (
-                      <article
-                        className={`line-item ${item.reviewed ? "reviewed" : ""}`}
-                        key={item.id}
-                        aria-label={`Line ${index + 1}`}
-                      >
-                        <div className="line-fields">
-                          <div className="description-fields">
-                            <input
-                              aria-label={`Description line ${index + 1}`}
-                              value={item.description}
-                              onChange={(e) =>
-                                row(item.id, "description", e.target.value)
-                              }
-                              placeholder="Card name, set and number"
-                              maxLength={500}
-                            />
-                            <input
-                              aria-label={`Condition and details line ${index + 1}`}
-                              value={item.details}
-                              onChange={(e) =>
-                                row(item.id, "details", e.target.value)
-                              }
-                              placeholder="Condition / finish / edition"
-                              maxLength={300}
-                            />
-                            <input
-                              aria-label={`Seller line ${index + 1}`}
-                              value={item.seller}
-                              onChange={(e) =>
-                                row(item.id, "seller", e.target.value)
-                              }
-                              placeholder="Seller"
-                              maxLength={200}
-                            />
-                          </div>
-                          <label className="compact-field">
-                            <span>Qty</span>
-                            <input
-                              aria-label={`Quantity line ${index + 1}`}
-                              inputMode="numeric"
-                              value={item.quantity}
-                              onChange={(e) =>
-                                row(item.id, "quantity", e.target.value)
-                              }
-                              maxLength={5}
-                            />
-                          </label>
-                          <label className="compact-field">
-                            <span>Unit price $</span>
-                            <input
-                              aria-label={`Unit price line ${index + 1}`}
-                              inputMode="decimal"
-                              value={item.unitPrice}
-                              onChange={(e) =>
-                                row(item.id, "unitPrice", e.target.value)
-                              }
-                              maxLength={12}
-                            />
-                          </label>
-                          <span className="line-total">
-                            {cents(item.unitPrice) !== null &&
-                            /^\d+$/.test(item.quantity)
-                              ? money(
-                                  cents(item.unitPrice)! *
-                                    Number(item.quantity),
-                                )
-                              : "—"}
-                          </span>
-                          <button
-                            className="delete"
-                            aria-label={`Delete line ${index + 1}`}
-                            onClick={() =>
-                              change({
-                                ...doc,
-                                items: doc.items.filter(
-                                  (i) => i.id !== item.id,
-                                ),
-                              })
-                            }
-                          >
-                            ×
-                          </button>
-                        </div>
-                        <div className="row-review">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={item.reviewed}
-                              onChange={(e) =>
-                                row(item.id, "reviewed", e.target.checked)
-                              }
-                            />
-                            {item.reviewed ? "Reviewed" : "Mark reviewed"}
-                          </label>
-                          {item.sourceText && (
-                            <details>
-                              <summary>Extracted source</summary>
-                              <pre>{item.sourceText}</pre>
-                            </details>
-                          )}
-                        </div>
-                      </article>
+            <DocumentEditor
+              doc={doc}
+              busy={busy}
+              canUndo={!!history.length}
+              field={field}
+              row={row}
+              change={change}
+              undo={() => {
+                const last = history.at(-1);
+                if (last) {
+                  setDoc(last);
+                  setHistory((h) => h.slice(0, -1));
+                  setConfirmed(false);
+                  setDirty(true);
+                }
+              }}
+              merge={() => {
+                const merged = consolidate(doc.items);
+                if (merged.length === doc.items.length) {
+                  setNotice(
+                    "No matching duplicates. Item, set, rarity, condition, seller and price must match.",
+                  );
+                  return;
+                }
+                change({ ...doc, items: merged });
+                setNotice(
+                  `${doc.items.length - merged.length} duplicate line(s) consolidated. Quantities and value preserved.`,
+                );
+              }}
+            />
+            <div className="source-review">
+              {doc.warnings.length > 0 && (
+                <section className="panel review-notes">
+                  <h3>Extraction checks</h3>
+                  <ul>
+                    {doc.warnings.map((w, i) => (
+                      <li key={i}>{w}</li>
                     ))}
-                  </div>
-                  <div className="review-all">
-                    <span>
-                      {unreviewed
-                        ? `${unreviewed} line${unreviewed === 1 ? "" : "s"} to review`
-                        : "All lines reviewed"}
-                    </span>
-                    <button
-                      className="text-button"
-                      disabled={!unreviewed}
-                      onClick={() =>
-                        change({
-                          ...doc,
-                          items: doc.items.map((i) => ({
-                            ...i,
-                            reviewed: true,
-                          })),
-                        })
-                      }
-                    >
-                      I checked every line — mark all reviewed
-                    </button>
-                  </div>
-                  <label className="field notes">
-                    <span>Reconciliation notes</span>
-                    <textarea
-                      value={doc.notes}
-                      onChange={(e) => field("notes", e.target.value)}
-                      placeholder="For example: removed one card that was missing from the package."
-                      rows={3}
-                      maxLength={3000}
+                  </ul>
+                  <p>
+                    Compare these with the original before confirming your
+                    document.
+                  </p>
+                </section>
+              )}
+              <details className="panel original-toggle">
+                <summary>
+                  Compare with original · {doc.sourceName || "Manual draft"}
+                </summary>
+                {source &&
+                  (source.type === "application/pdf" ? (
+                    <iframe title="Original uploaded PDF" src={source.url} />
+                  ) : (
+                    <img
+                      alt="Original uploaded TCGplayer order"
+                      src={source.url}
                     />
-                  </label>
-                </fieldset>
-              </section>
-              <aside className="side-column">
-                <section className="panel totals-panel">
-                  <p className="eyebrow">RECONCILED AMOUNTS</p>
-                  <h2>
-                    Order summary <span className="tag">USD</span>
-                  </h2>
-                  <dl>
-                    <div>
-                      <dt>Cards received</dt>
-                      <dd>{t.count}</dd>
-                    </div>
-                    <div>
-                      <dt>Item subtotal</dt>
-                      <dd>{t.valid ? money(t.subtotal) : "—"}</dd>
-                    </div>
-                  </dl>
-                  <fieldset disabled={busy}>
-                    <legend className="sr-only">Order charges</legend>
-                    {(["shipping", "tax", "discount"] as const).map((key) => (
-                      <label className="charge" key={key}>
-                        <span>
-                          {key[0].toUpperCase() + key.slice(1)}{" "}
-                          {key === "discount" ? "−" : "+"}
-                        </span>
-                        <span className="money-input">
-                          <span>$</span>
-                          <input
-                            aria-label={key[0].toUpperCase() + key.slice(1)}
-                            inputMode="decimal"
-                            value={doc[key]}
-                            onChange={(e) => field(key, e.target.value)}
-                            maxLength={12}
-                          />
-                        </span>
-                      </label>
-                    ))}
-                  </fieldset>
-                  <p className="helper">
-                    Shipping, tax and discount are fixed amounts. Review them
-                    after changing the cards.
-                  </p>
-                  <div className="grand-total">
-                    <span>Reconciled total</span>
-                    <strong data-testid="grand-total">
-                      {t.valid ? money(t.total) : "Check amounts"}
-                    </strong>
-                  </div>
-                  {doc.sourceTotal !== null && (
-                    <p className="source-comparison">
-                      Printed order total{" "}
-                      <strong>{money(doc.sourceTotal)}</strong>
-                      {t.valid && doc.sourceTotal !== t.total && (
-                        <span>
-                          Difference:{" "}
-                          {t.total - doc.sourceTotal < 0 ? "−" : "+"}
-                          {money(Math.abs(t.total - doc.sourceTotal))}
-                        </span>
-                      )}
-                    </p>
-                  )}
-                </section>
-                {doc.warnings.length > 0 && (
-                  <section className="panel review-notes">
-                    <h3>Extraction checks</h3>
-                    <ul>
-                      {doc.warnings.map((w, i) => (
-                        <li key={i}>{w}</li>
-                      ))}
-                    </ul>
-                    <p>
-                      These describe the original extraction. Resolve them
-                      against the source before confirming below.
-                    </p>
-                  </section>
-                )}
-                <section className="panel source-panel">
-                  <h3>Source document</h3>
-                  <p className="filename">{doc.sourceName || "Manual draft"}</p>
-                  {source &&
-                    (source.type === "application/pdf" ? (
-                      <iframe title="Original uploaded PDF" src={source.url} />
-                    ) : (
-                      <img
-                        alt="Original uploaded TCGplayer order"
-                        src={source.url}
-                      />
-                    ))}
-                  <details>
-                    <summary>View extracted text</summary>
-                    <pre>{doc.sourceText || "No source text saved."}</pre>
-                  </details>
-                </section>
-              </aside>
+                  ))}
+                <details>
+                  <summary>View extracted text</summary>
+                  <pre>{doc.sourceText || "No source text saved."}</pre>
+                </details>
+              </details>
             </div>
             {!t.valid && (
               <div className="message error" role="alert">
@@ -840,6 +530,12 @@ export default function Home() {
                     {doc.address}
                     <br />
                     <strong>Package:</strong> {doc.reference}
+                    <br />
+                    <strong>Tracking:</strong> {doc.tracking}
+                    <br />
+                    <strong>Bill to:</strong> {doc.billingRecipient}
+                    <br />
+                    {doc.billingAddress}
                   </p>
                 </div>
                 <table>
@@ -857,6 +553,8 @@ export default function Home() {
                         <td>{i.quantity}</td>
                         <td>
                           {i.description}
+                          <small>{i.setName}</small>
+                          <small>{i.rarity}</small>
                           <small>
                             {i.details}
                             {i.seller ? ` · ${i.seller}` : ""}
@@ -907,8 +605,9 @@ export default function Home() {
             <span aria-hidden="true">▤</span>
             <h2>A clean document, from the cards in hand.</h2>
             <p>
-              Your extracted order will appear here. You can edit every line,
-              consolidate duplicates, and check the totals before exporting.
+              Your order will appear as an editable document. Click any box to
+              change its details. Remove missing items and check totals before
+              exporting.
             </p>
           </section>
         )}

@@ -170,3 +170,66 @@ test("missing OCR assets fail clearly rather than leaving an endless scanner", a
   await expect(page.locator(".message.error")).toBeVisible();
   await expect(page.getByRole("button", { name: "Choose file" })).toBeEnabled();
 });
+
+for (const file of [
+  "marketplace-text.pdf",
+  "marketplace-screenshot.png",
+  "marketplace-scanned.pdf",
+]) {
+  test(`marketplace grid: ${file}`, async ({ page }, info) => {
+    await page.goto("/");
+    await page
+      .getByLabel("Upload TCGplayer screenshot or PDF")
+      .setInputFiles(`tests/fixtures/${file}`);
+    await expect(
+      page.getByLabel("Description line 13", { exact: true }),
+    ).toBeVisible({ timeout: 100_000 });
+    await expect(page.getByTestId("grand-total")).toHaveText("$75.85");
+    await expect(page.getByTestId("card-count")).toHaveText("21");
+    await expect(
+      page.getByLabel("Order number *", { exact: true }),
+    ).toHaveValue("SYNTHETIC-001-TEST");
+    await expect(
+      page.getByLabel("Billing recipient", { exact: true }),
+    ).toHaveValue("Example Buyer");
+    await expect(page.getByLabel("Set line 1", { exact: true })).toHaveValue(
+      "Synthetic Test Set",
+    );
+    await expect(page.getByLabel("Rarity line 1", { exact: true })).toHaveValue(
+      "Ultra Rare",
+    );
+    await expect(
+      page.getByLabel("Quantity line 4", { exact: true }),
+    ).toHaveValue("4");
+    await expect(
+      page.getByLabel("Unit price line 12", { exact: true }),
+    ).toHaveValue("13.49");
+    await page.getByLabel("Quantity line 4", { exact: true }).fill("2");
+    await page
+      .getByLabel("Billing recipient", { exact: true })
+      .fill("Updated Example Buyer");
+    await page
+      .getByLabel("Set line 1", { exact: true })
+      .fill("Corrected Test Set");
+    await expect(page.getByTestId("grand-total")).toHaveText("$73.87");
+    await page.getByLabel("Delete line 13", { exact: true }).click();
+    await expect(page.getByTestId("grand-total")).toHaveText("$72.12");
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect(page.getByTestId("grand-total")).toHaveText("$73.87");
+    await page.getByRole("button", { name: "I checked every line" }).click();
+    await page.getByLabel("I checked the order details").check();
+    const wait = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download reconciled PDF" }).click();
+    await (await wait).saveAs(info.outputPath("marketplace-reconciled.pdf"));
+    await page.screenshot({
+      path: info.outputPath("document-boxes.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
+}

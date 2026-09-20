@@ -6,6 +6,7 @@ import {
   type Invoice,
   type LineItem,
 } from "./invoice";
+import { parseMarketplaceLayout, type TextPage } from "./layout";
 
 const AMOUNT = /(?:US\s*)?\$\s*([\d,]+\.\d{2})|\b([\d,]+\.\d{2})\b/g;
 const SUMMARY =
@@ -31,7 +32,14 @@ function amounts(line: string) {
 export function parseOrder(
   text: string,
   sourceName = "Pasted TCGplayer order",
+  layout?: TextPage[],
 ): Invoice {
+  const structured = layout?.length ? parseMarketplaceLayout(layout) : null;
+  if (structured) {
+    structured.sourceText = text;
+    structured.sourceName = sourceName;
+    return checkExtraction(structured);
+  }
   const invoice = emptyInvoice();
   invoice.sourceText = text;
   invoice.sourceName = sourceName;
@@ -281,7 +289,13 @@ export function parseOrder(
     addWarning(
       "Multiple order numbers found. Import one order at a time, or separate the orders before exporting.",
     );
-  if (/£|€|\b(?:GBP|EUR|CAD|AUD)\b/.test(text))
+  return checkExtraction(invoice);
+}
+function checkExtraction(invoice: Invoice): Invoice {
+  const addWarning = (warning: string) => {
+    if (!invoice.warnings.includes(warning)) invoice.warnings.push(warning);
+  };
+  if (/£|€|\b(?:GBP|EUR|CAD|AUD)\b/.test(invoice.sourceText))
     addWarning(
       "This V1 supports USD only. A different currency may be present; verify every amount before export.",
     );
@@ -292,6 +306,10 @@ export function parseOrder(
   if (!invoice.orderNumber)
     addWarning("Order number was not recognised. Enter it from the source.");
   const t = totals(invoice);
+  if (invoice.sourceQuantity != null && invoice.sourceQuantity !== t.count)
+    addWarning(
+      "Extracted card quantity differs from the printed quantity. Check for missing or misread rows.",
+    );
   if (invoice.sourceSubtotal !== null && invoice.sourceSubtotal !== t.subtotal)
     addWarning(
       "Extracted item subtotal differs from the printed subtotal. Check for missing or misread lines.",

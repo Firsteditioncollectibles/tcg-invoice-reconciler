@@ -1,6 +1,8 @@
 export type LineItem = {
   id: string;
   description: string;
+  setName?: string;
+  rarity?: string;
   details: string;
   seller: string;
   quantity: string;
@@ -12,6 +14,12 @@ export type Invoice = {
   version: 1;
   orderNumber: string;
   orderDate: string;
+  channel?: string;
+  billingRecipient?: string;
+  billingAddress?: string;
+  tracking?: string;
+  shippingMethod?: string;
+  sourceQuantity?: number | null;
   seller: string;
   recipient: string;
   address: string;
@@ -35,6 +43,12 @@ export function emptyInvoice(): Invoice {
     version: 1,
     orderNumber: "",
     orderDate: "",
+    channel: "",
+    billingRecipient: "",
+    billingAddress: "",
+    tracking: "",
+    shippingMethod: "",
+    sourceQuantity: null,
     seller: "",
     recipient: "",
     address: "",
@@ -128,6 +142,8 @@ export function consolidate(items: LineItem[]): LineItem[] {
     const p = cents(item.unitPrice);
     const key = JSON.stringify([
       item.description.trim().toLocaleLowerCase(),
+      (item.setName ?? "").trim().toLocaleLowerCase(),
+      (item.rarity ?? "").trim().toLocaleLowerCase(),
       item.details.trim().toLocaleLowerCase(),
       item.seller.trim().toLocaleLowerCase(),
       p,
@@ -157,6 +173,18 @@ export function readDraft(raw: string): Invoice {
     throw new Error("Draft is too large (maximum 2 MB).");
   const value = JSON.parse(raw) as Invoice;
   const base = emptyInvoice();
+  // V1 drafts saved before document-box editing did not contain these fields.
+  if (value && typeof value === "object") {
+    for (const key of [
+      "channel",
+      "billingRecipient",
+      "billingAddress",
+      "tracking",
+      "shippingMethod",
+    ] as const)
+      if (value[key] === undefined) value[key] = "";
+    if (value.sourceQuantity === undefined) value.sourceQuantity = null;
+  }
   if (
     !value ||
     value.version !== 1 ||
@@ -185,6 +213,11 @@ export function readDraft(raw: string): Invoice {
       throw new Error("Invalid source totals.");
   }
   const ids = new Set<string>();
+  if (
+    value.sourceQuantity !== null &&
+    (!Number.isSafeInteger(value.sourceQuantity) || value.sourceQuantity! < 0)
+  )
+    throw new Error("Invalid source quantity.");
   for (const item of value.items) {
     if (
       !item ||
@@ -198,6 +231,8 @@ export function readDraft(raw: string): Invoice {
         "sourceText",
       ].some((k) => typeof item[k as keyof LineItem] !== "string") ||
       typeof item.reviewed !== "boolean" ||
+      (item.setName !== undefined && typeof item.setName !== "string") ||
+      (item.rarity !== undefined && typeof item.rarity !== "string") ||
       ids.has(item.id)
     )
       throw new Error("The draft contains invalid line items.");

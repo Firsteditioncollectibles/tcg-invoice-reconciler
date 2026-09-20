@@ -51,12 +51,23 @@ export async function createReconciledPdf(
   const exportedText = [
     invoice.orderNumber,
     invoice.orderDate,
+    invoice.channel,
+    invoice.billingRecipient,
+    invoice.billingAddress,
+    invoice.tracking,
+    invoice.shippingMethod,
     invoice.seller,
     invoice.recipient,
     invoice.address,
     invoice.reference,
     invoice.notes,
-    ...invoice.items.flatMap((i) => [i.description, i.details, i.seller]),
+    ...invoice.items.flatMap((i) => [
+      i.description,
+      i.setName,
+      i.rarity,
+      i.details,
+      i.seller,
+    ]),
   ].join("");
   if (
     /[^\x09\x0A\x0D\x20-\x7E\u00A0-\u00FF\u2013\u2014\u2018\u2019\u201C\u201D]/.test(
@@ -101,50 +112,76 @@ export async function createReconciledPdf(
       { align: "right" },
     );
   };
+  const after = () =>
+    (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
   autoTable(doc, {
-    startY: 96,
-    theme: "plain",
+    startY: 94,
+    theme: "grid",
     margin: { left: margin, right: margin, top: 94, bottom: 55 },
     styles: {
       font: "LiberationSans",
-      fontSize: 9,
-      cellPadding: 5,
+      fontSize: 8,
+      cellPadding: 7,
       overflow: "linebreak",
-      textColor: [35, 49, 63],
-    },
-    columnStyles: {
-      0: { cellWidth: (width - 2 * margin) / 2 },
-      1: { cellWidth: (width - 2 * margin) / 2 },
+      textColor: [65, 70, 78],
+      lineColor: [215, 215, 215],
+      lineWidth: 0.4,
     },
     body: [
       [
-        `Order number: ${normal(invoice.orderNumber)}`,
-        `Order date: ${normal(invoice.orderDate) || "Not specified"}`,
-      ],
-      [
-        `Seller: ${normal(invoice.seller) || "See line items"}`,
-        `Recipient: ${normal(invoice.recipient) || "Not specified"}`,
-      ],
-      [
-        `Shipment / package: ${normal(invoice.reference) || "Not specified"}`,
-        normal(invoice.address),
+        `ORDER DATE\n${normal(invoice.orderDate) || "Not specified"}`,
+        `CHANNEL\n${normal(invoice.channel || "TCG Marketplace")}`,
+        `ORDER NUMBER\n${normal(invoice.orderNumber)}`,
       ],
     ],
   });
-  const after = () =>
-    (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+  autoTable(doc, {
+    startY: after(),
+    theme: "grid",
+    margin: { left: margin, right: margin, top: 94, bottom: 55 },
+    styles: {
+      font: "LiberationSans",
+      fontSize: 8,
+      cellPadding: 7,
+      overflow: "linebreak",
+      textColor: [65, 70, 78],
+      lineColor: [225, 225, 225],
+      lineWidth: 0.3,
+      valign: "top",
+    },
+    columnStyles: {
+      0: { cellWidth: 120 },
+      1: { cellWidth: 130 },
+      2: { cellWidth: 125 },
+      3: { cellWidth: width - 2 * margin - 375 },
+    },
+    body: [
+      [
+        `ORDER SUMMARY\nQuantity: ${t.count}\nSubtotal: ${money(t.subtotal)}\nShipping: ${money(t.shipping!)}\nSales tax: ${money(t.tax!)}\nDiscount: -${money(t.discount!)}\nTotal: ${money(t.total)}`,
+        normal(
+          `SHIP TO\n${invoice.recipient || "Not specified"}\n${invoice.address}\n${invoice.reference ? "Package: " + invoice.reference : ""}`,
+        ),
+        normal(
+          `BILL TO\n${invoice.billingRecipient || "Not specified"}\n${invoice.billingAddress || ""}`,
+        ),
+        normal(
+          `SHIPPED AND SOLD BY\n${invoice.seller || "See line items"}\n${invoice.tracking ? "Tracking: " + invoice.tracking : ""}\n${invoice.shippingMethod || ""}`,
+        ),
+      ],
+    ],
+  });
   const differentSellers =
     new Set(invoice.items.map((i) => i.seller).filter(Boolean)).size > 1;
   autoTable(doc, {
     startY: after() + 18,
     margin: { top: 96, left: margin, right: margin, bottom: 55 },
-    head: [["QTY", "DESCRIPTION / CONDITION", "UNIT PRICE", "LINE TOTAL"]],
+    head: [["ITEMS", "DETAILS", "PRICE", "QUANTITY"]],
     body: invoice.items.map((i) => [
-      i.quantity,
+      normal([i.description, i.setName].filter(Boolean).join("\n")),
       normal(
         [
-          i.description,
-          i.details,
+          i.rarity ? `Rarity: ${i.rarity}` : "",
+          i.details ? `Condition: ${i.details}` : "",
           i.seller && (differentSellers || i.seller !== invoice.seller)
             ? `Seller: ${i.seller}`
             : "",
@@ -153,58 +190,48 @@ export async function createReconciledPdf(
           .join("\n"),
       ),
       money(cents(i.unitPrice)!),
-      money(cents(i.unitPrice)! * Number(i.quantity)),
+      i.quantity,
     ]),
     theme: "grid",
     styles: {
       font: "LiberationSans",
-      fontSize: 9,
-      cellPadding: 8,
+      fontSize: 8,
+      cellPadding: 7,
       lineColor: [220, 226, 233],
       lineWidth: 0.4,
       overflow: "linebreak",
       textColor: [35, 49, 63],
     },
-    headStyles: { fillColor: [20, 44, 74], textColor: 255, fontStyle: "bold" },
+    headStyles: {
+      fillColor: [237, 237, 237],
+      textColor: [75, 75, 75],
+      fontStyle: "bold",
+    },
     alternateRowStyles: { fillColor: [246, 248, 251] },
     columnStyles: {
-      0: { cellWidth: 42, halign: "center" },
-      1: { cellWidth: width - 2 * margin - 204 },
-      2: { cellWidth: 80, halign: "right" },
-      3: { cellWidth: 82, halign: "right" },
+      0: { cellWidth: width - 2 * margin - 288 },
+      1: { cellWidth: 164 },
+      2: { cellWidth: 65, halign: "right", valign: "middle" },
+      3: { cellWidth: 59, halign: "center", valign: "middle" },
     },
     rowPageBreak: "avoid",
   });
-  let y = after() + 16;
-  if (y + 158 > height - 55) {
-    doc.addPage();
-    y = 100;
-  }
   autoTable(doc, {
-    startY: y,
+    startY: after() + 10,
     margin: { left: width - margin - 236, right: margin, top: 96, bottom: 55 },
     theme: "plain",
-    styles: { font: "LiberationSans", fontSize: 10, cellPadding: 6 },
+    styles: {
+      font: "LiberationSans",
+      fontSize: 10,
+      cellPadding: 6,
+      fontStyle: "bold",
+      fillColor: [235, 241, 249],
+    },
     columnStyles: {
       0: { cellWidth: 145 },
       1: { cellWidth: 91, halign: "right" },
     },
-    body: [
-      ["Item subtotal", money(t.subtotal)],
-      ["Shipping", money(t.shipping!)],
-      ["Tax", money(t.tax!)],
-      ["Discount", `-${money(t.discount!)}`],
-      [
-        {
-          content: "Reconciled total (USD)",
-          styles: { fontStyle: "bold", fillColor: [235, 241, 249] },
-        },
-        {
-          content: money(t.total),
-          styles: { fontStyle: "bold", fillColor: [235, 241, 249] },
-        },
-      ],
-    ],
+    body: [["Reconciled total (USD)", money(t.total)]],
   });
   if (invoice.notes.trim())
     autoTable(doc, {

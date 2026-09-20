@@ -22,8 +22,8 @@ No API key, database, login or environment variables are needed. OCR workers, En
 ## V1 workflow
 
 1. Choose a TCGplayer screenshot (PNG/JPG/WebP) or PDF, or paste copied order text. Maximum 20 MB, 20 PDF pages, 40 megapixels per image. PDF pages with usable text are extracted directly; scanned pages go through English OCR.
-2. Compare the original/source text with the extracted order and line items. All imported rows begin unreviewed. Warnings identify missing metadata, inferred quantities, unsupported currency, low OCR confidence and source-total discrepancies.
-3. Edit card descriptions, set/card numbers, condition, seller, quantity and unit price. Delete missing items, add rows, undo edits, or consolidate exact duplicates. Consolidation requires matching description, details, seller and price; it preserves quantities and cents.
+2. Your order opens as an editable document matching the marketplace boxes. Click a box to edit the order date/number, ship-to/bill-to addresses, seller/tracking, or a card cell. Compare the original/source text with the extracted order and line items. All imported rows begin unreviewed. Warnings identify missing metadata, inferred quantities, unsupported currency, low OCR confidence and source-total discrepancies.
+3. Edit card descriptions, set/card numbers, rarity, condition, seller, quantity and unit price. Delete missing items, add rows, undo edits, or consolidate exact duplicates. Consolidation requires matching description, set, rarity, details, seller and price; it preserves quantities and cents.
 4. Review shipping, tax and discount. They are fixed editable amounts; the app does not infer tax rules or recalculate a tax rate. Totals use integer cents throughout.
 5. Mark reviewed rows, confirm the order details and charges, then download the PDF. The PDF uses a familiar order table, embedded fonts, wrapped rows, repeated page headings, page numbers and a permanent buyer-prepared disclosure. It is **not a newly seller-issued invoice**.
 6. Download a JSON draft before closing. Reopen it with **Open draft** to continue. Drafts preserve editable data and extracted text, but do not embed the original image/PDF. Unsaved edits trigger a browser leave warning where supported.
@@ -51,7 +51,7 @@ Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` only when a compatible local Chromium 
 - One TCGplayer order per import. Multiple detected order numbers are flagged; separate those documents before export.
 - USD and English OCR for V1. PDF output supports English/Latin accented text; unsupported glyphs produce an explicit error instead of a corrupted PDF.
 - The parser supports tabular receipts/packing slips, wrapped descriptions, price/quantity/total columns and stacked product blocks. OCR and layout interpretation are fallible: every extracted order needs visual review. Unusual seller layouts, cropped columns and tiny/blurred screenshots may need text correction or manual rows.
-- The automated suite uses synthetic TCGplayer-shaped fixtures. Testing against the user's real receipts remains a follow-up; no private receipt was available in this checkout.
+- The automated suite covers both packing slips and marketplace grids using synthetic fixtures. One real customer marketplace screenshot was also verified privately; original customer records are never committed. Other layouts still need source review.
 - No automatic sending, cloud storage, supplier-issued invoice generation, deployment integration or background processing is included.
 
 ## Isolation

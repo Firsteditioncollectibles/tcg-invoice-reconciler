@@ -1,7 +1,19 @@
-# V1 handover checkpoint — 19 September 2026
+# V1.1 handover checkpoint — 20 September 2026
 
-Status: V1 is live at https://tcg-invoice-reconciler.vercel.app/ and verified locally, in GitHub Actions, and on the hosted deployment. Code remains on `feat/tcgplayer-reconciler-v1`.
+Status: V1.1 document-box editing is implemented and locally verified, ready to replace V1 at https://tcg-invoice-reconciler.vercel.app/. Code remains on `feat/tcgplayer-reconciler-v1`.
 Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
+
+## 20 September correction — marketplace order boxes
+
+- The supplied real marketplace screenshot exposed a serious V1 parsing gap: the live parser mixed summary amounts into card rows. Synthetic packing-slip fixtures had not covered the multi-column marketplace layout.
+- Added positioned-text parsing for separate summary, shipping, billing and seller/tracking boxes, plus item/details/price/quantity columns. Screenshot and scanned-PDF imports read isolated quantity cells to handle narrow digits and table rules. Unreadable quantities remain blank and block export.
+- The primary editor now is the TCGplayer-style document itself. Click boxes to edit order details, addresses, tracking, card names, sets, rarity, condition, price and quantity. Delete/undo/consolidate remain available; calculations use integer cents. Set and rarity are included in consolidation boundaries.
+- PDF export follows the same metadata boxes and four-column table, retaining buyer-prepared disclosure. Older saved drafts migrate with empty new fields.
+- Validation: typecheck and production build passed; **17/17 unit/PDF tests**, **10/10 browser tests (38.3s)**. Marketplace tests cover native PDF, screenshot and scanned PDF, then in-document edits, undo/deletion, exact totals, PDF export and mobile overflow.
+- A separate temporary private browser regression passed against the user's actual attachment: 13 lines, 21 cards, $68.02 subtotal, $1.48 shipping, $6.35 tax, $75.85 total. Changing a four-card row to two recalculates $73.87. The attachment and its extracted personal details are excluded from git.
+- Synthetic regression fixtures and script are committed. Evidence: `docs/evidence/marketplace-boxes-editor.png` and `marketplace-boxes-example.pdf`. Export text and rendered one-page layout checked for edited billing/set values, total and disclosure.
+- Deployment and hosted verification of this correction remain pending. Vercel's source uploader did not advance after folder selection (including one retry after verifying file synchronization) or file selection. Its MCP deployment method still returns "Tool deploy_to_vercel not found", including after reopening the plugin. No new deployment was submitted.
+- The existing project dashboard offers Git connection / CLI deployment. Opening the GitHub connection had previously been blocked by automatic approval review because its access scope was not visible. Ask for permission to connect only this repository to the existing reconciler project; do not grant broader repository access or reuse any other project. The next action should resolve this publishing route, then perform hosted verification.
 
 ## Completed
 
@@ -18,7 +30,7 @@ Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
 - Responsive editor, source pane and document preview.
 - Reproducible dependencies, same-origin scanner assets and CI workflow; no API keys or database.
 
-## Latest completed validation
+## Initial V1 validation — 19 September
 
 - `npm run typecheck`: passed.
 - `npm test`: **14/14 passed**.
@@ -50,7 +62,7 @@ The usual Playwright browser download timed out here. A Chromium binary obtained
 ## Remaining boundary
 
 - Vercel connector deployment and build-log methods returned "Tool not found"; project/deployment metadata reads worked. The dashboard's direct folder upload completed successfully. The Git import path had an unapproved GitHub access-scope change, so no GitHub connection was established.
-- No genuine customer receipt was available. Test representative real TCGplayer screenshots/packing slips next, then adjust the parser for any demonstrated layout gaps. Do not claim universal OCR accuracy.
+- One genuine marketplace screenshot is now verified; other layouts and PDFs still require source review. Do not claim universal OCR accuracy.
 - Keep V1 scope explicit: one order per import, USD, English OCR, supported Latin PDF text; see README.md.
 - This deployment uses only this repository and its own project/resources. No CardScout resource was accessed or reused.
 
