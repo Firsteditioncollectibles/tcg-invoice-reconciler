@@ -4,7 +4,7 @@ A standalone, TCGplayer-focused tool for turning an order screenshot or PDF into
 
 Live V1: https://tcg-invoice-reconciler.vercel.app/
 
-The separate Vercel project was deployed from the tested source files. It is not connected to GitHub auto-deployments; see `BUILD_STATUS.md` for the deployed application commit and verified project ID.
+The dedicated Vercel project is connected only to this repository. Production deployments track `feat/tcgplayer-reconciler-v1`; `main` is still the starter branch. See `BUILD_STATUS.md` for the verified project, tested application commit and publishing checkpoint.
 
 ## Run
 

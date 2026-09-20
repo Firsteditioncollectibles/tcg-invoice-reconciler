@@ -3,6 +3,14 @@
 Status: V1.1 screenshot-matched editing/export is implemented and locally verified, ready to replace V1 at https://tcg-invoice-reconciler.vercel.app/. Code remains on `feat/tcgplayer-reconciler-v1`.
 Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
 
+## 20 September publishing — current
+
+- The user approved the repository-only GitHub/Vercel connection and publication. Connected `Firsteditioncollectibles/tcg-invoice-reconciler` to the existing dedicated project `prj_biGutj7uN6aGN7BhHovBjUz7Gkzs` in team `team_5DQoS9LZQGvYBVK00CtKwcPJ`. No new project, environment variables, database or broader repository selection was added.
+- Production branch tracking is now `feat/tcgplayer-reconciler-v1`; the dashboard confirmed the setting was saved. Do not deploy the starter `main` branch. Pushes now trigger production builds. Default deployment protection remains unchanged.
+- Application commit `d3beae2ac4ad6316171c4c3e8b7233c51ff40056` passed the complete GitHub Actions workflow **35532241046**, including all 23 unit/PDF tests, production build and all 13 browser workflows.
+- This documentation-only push initiates the first Git-connected deployment of that exact application. Inspect its deployment status and perform hosted upload/edit/export verification before claiming the new version is live. The previous connection blocker in the historical entries below is resolved.
+- The user said this will eventually become part of CardScout. No present integration was authorized or performed; the existing strict isolation boundary remains.
+
 ## 20 September exact-layout correction — current
 
 - User explicitly requested the exact supplied marketplace screenshot layout. Replaced the approximate boxed editor and auto-table PDF with one shared measured drawing layout: source header buttons, four unboxed metadata columns, source tax label, blue card names, actual card thumbnails, alternating rows and matching column widths/row spacing. The reviewed 13-row source exports at the same 1436:1632 proportions. Longer edited fields wrap; headers/metadata/rows expand and long orders paginate without cutting rows.
@@ -105,4 +113,4 @@ The usual Playwright browser download timed out here. A Chromium binary obtained
 1. Keep this V1 branch as the single source of the build; inspect remote HEAD before adding work.
 2. Reproduce any real-receipt parsing failures with anonymized fixtures and test the fix before proceeding.
 3. For further application changes, rerun the affected checks and deploy to the verified existing reconciler project. Keep deployment protection enabled and verify the live workflow after redeploying.
-4. Honor the clean PDF preference above; retain reconciliation identification in the app, filename, PDF metadata and total label. Do not restore the removed title or printed disclaimer blocks.
+4. Honor the clean PDF preference above; retain reconciliation identification in the app, filename, PDF metadata. Do not restore the removed title or printed disclaimer blocks.

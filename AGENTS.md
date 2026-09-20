@@ -17,3 +17,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Keep money calculations in integer cents. Do not silently accept invalid monetary inputs or merge different sellers, conditions, card variants or prices.
 - Test the affected stage before proceeding. Required V1 checks are documented in README.md.
 - No real customer records, private invoices, credentials, or environment files belong in this public repository. Use synthetic fixtures.
+
+## Publishing authorization — 20 September 2026
+
+- The user approved connecting only this repository to its existing dedicated Vercel project and publishing the tested reconciler. The connection is now established; do not ask for this permission again. Production tracks `feat/tcgplayer-reconciler-v1` (main still contains the starter). Pushes to this branch trigger deployments. Keep changes limited to project `prj_biGutj7uN6aGN7BhHovBjUz7Gkzs`, team `team_5DQoS9LZQGvYBVK00CtKwcPJ`.
+- The user says this may become a CardScout feature later. That is a future plan, not authorization to access or integrate CardScout now. Preserve the current isolation boundary until explicitly authorized.
