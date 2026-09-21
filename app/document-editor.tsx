@@ -22,7 +22,6 @@ export default function DocumentEditor({
   undo,
   merge,
 }: Props) {
-  const unreviewed = doc.items.filter((i) => !i.reviewed).length;
   return (
     <section className="document-editor" aria-labelledby="review-title">
       <div className="document-toolbar">
@@ -98,25 +97,6 @@ export default function DocumentEditor({
             onChange={(e) => field("reference", e.target.value)}
           />
         </label>
-        <div className="review-all">
-          <span>
-            {unreviewed
-              ? `${unreviewed} lines to review`
-              : "All lines reviewed"}
-          </span>
-          <button
-            className="text-button"
-            disabled={!unreviewed}
-            onClick={() =>
-              change({
-                ...doc,
-                items: doc.items.map((i) => ({ ...i, reviewed: true })),
-              })
-            }
-          >
-            I checked every line — mark all reviewed
-          </button>
-        </div>
         <label className="field notes">
           <span>Reconciliation notes</span>
           <textarea

@@ -14,6 +14,7 @@ import { parseOrder } from "../lib/parser";
 import { extractFile } from "../lib/extract";
 import DocumentEditor from "./document-editor";
 import PdfPreview from "./pdf-preview";
+import { pdfFileName, draftFileName } from "../lib/filenames";
 
 const SAMPLE = `TCGplayer\nOrder Number: SAMPLE-123456\nOrder Date: September 19, 2026\nSeller: Example Cards\nShip To:\nSample Buyer\n123 Example Road\nExample City, EX 12345\nQuantity Description Price Total\n2 Pikachu 025/165 Near Mint $1.25 $2.50\n1 Charizard ex 199/165 Near Mint Holofoil $10.00 $10.00\n1 Pikachu 025/165 Near Mint $1.25 $1.25\nSubtotal: $13.75\nShipping: $1.99\nSales Tax: $0.80\nOrder Total: $16.54`;
 function download(blob: Blob, name: string) {
@@ -35,20 +36,13 @@ export default function Home() {
     null,
   );
   const [paste, setPaste] = useState("");
-  const [confirmed, setConfirmed] = useState(false);
   const [preview, setPreview] = useState<Uint8Array | null>(null);
   const [dirty, setDirty] = useState(false);
   const upload = useRef<HTMLInputElement>(null);
   const draftInput = useRef<HTMLInputElement>(null);
   const abort = useRef<AbortController | null>(null);
   const t = totals(doc);
-  const unreviewed = doc.items.filter((i) => !i.reviewed).length;
-  const canExport =
-    t.valid &&
-    doc.items.length > 0 &&
-    !!doc.orderNumber.trim() &&
-    !unreviewed &&
-    confirmed;
+  const canExport = t.valid && doc.items.length > 0 && !!doc.orderNumber.trim();
   useEffect(
     () => () => {
       if (source) URL.revokeObjectURL(source.url);
@@ -74,7 +68,6 @@ export default function Home() {
   function change(next: Invoice) {
     setHistory((h) => [...h.slice(-29), doc]);
     setDoc(next);
-    setConfirmed(false);
     setPreview(null);
     setDirty(true);
     setError("");
@@ -99,7 +92,6 @@ export default function Home() {
   function replace(next: Invoice) {
     setHistory([]);
     setDoc(next);
-    setConfirmed(false);
     setDirty(true);
     setError("");
     setPreview(null);
@@ -166,7 +158,7 @@ export default function Home() {
     setBusy(true);
     setProgress("Preparing your reconciled PDF…");
     try {
-      const { createReconciledPdf, pdfFileName } = await import("../lib/pdf");
+      const { createReconciledPdf } = await import("../lib/pdf");
       const bytes =
         preview ??
         new Uint8Array((await createReconciledPdf(doc)).output("arraybuffer"));
@@ -176,7 +168,7 @@ export default function Home() {
       } else {
         download(
           new Blob([new Uint8Array(bytes).buffer], { type: "application/pdf" }),
-          pdfFileName(doc.orderNumber),
+          pdfFileName(doc.orderNumber, doc.seller),
         );
         setNotice(
           "Reconciled PDF downloaded. Save a draft too if you want to reopen the editable order.",
@@ -196,7 +188,7 @@ export default function Home() {
   function saveDraft() {
     download(
       new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }),
-      `tcg-reconciler-${doc.orderNumber.replace(/[^a-zA-Z0-9_-]/g, "-") || "draft"}.json`,
+      draftFileName(doc.orderNumber, doc.seller),
     );
     setDirty(false);
     setNotice("Editable draft downloaded. Use Open draft to resume later.");
@@ -407,7 +399,6 @@ export default function Home() {
                 if (last) {
                   setDoc(last);
                   setHistory((h) => h.slice(0, -1));
-                  setConfirmed(false);
                   setPreview(null);
                   setDirty(true);
                 }
@@ -435,10 +426,7 @@ export default function Home() {
                       <li key={i}>{w}</li>
                     ))}
                   </ul>
-                  <p>
-                    Compare these with the original before confirming your
-                    document.
-                  </p>
+                  <p>Compare these with the original before downloading.</p>
                 </section>
               )}
               <details className="panel original-toggle">
@@ -477,28 +465,14 @@ export default function Home() {
                 <p className="eyebrow">03 / EXPORT</p>
                 <h2 id="export-title">Ready for your shipment</h2>
                 <p>{DISCLOSURE}</p>
-                <label className="confirmation">
-                  <input
-                    type="checkbox"
-                    checked={confirmed}
-                    disabled={
-                      busy || unreviewed > 0 || !t.valid || !doc.items.length
-                    }
-                    onChange={(e) => setConfirmed(e.target.checked)}
-                  />
-                  <span>
-                    I checked the order details, received items and charges
-                    against the source.
-                  </span>
-                </label>
+                <p className="helper">
+                  Saves as {pdfFileName(doc.orderNumber, doc.seller)}
+                </p>
                 {!canExport && (
                   <p className="helper">
                     {!doc.orderNumber.trim() ? "Enter the order number. " : ""}
-                    {unreviewed
-                      ? `Review ${unreviewed} remaining line(s). `
-                      : ""}
-                    {!confirmed
-                      ? "Confirm the document to enable PDF export."
+                    {!t.valid
+                      ? "Correct the highlighted item details or amounts."
                       : ""}
                   </p>
                 )}

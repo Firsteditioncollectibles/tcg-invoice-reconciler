@@ -3,6 +3,13 @@
 Status: V1.1 screenshot-matched editing/export is LIVE at https://tcg-invoice-reconciler.vercel.app/. Code remains on `feat/tcgplayer-reconciler-v1`.
 Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
 
+## Simpler export and store filenames — 21 September
+
+- User requested upload/edit/download without repeated checkboxes. Removed per-row review, mark-all and final confirmation controls; automatic order-number/item/amount validation still blocks incomplete exports. Edits and undo still invalidate the PDF preview. Legacy reviewed flags remain readable in older drafts but no longer gate export.
+- PDF downloads use only the order-level Shipped and sold by store name plus `.pdf`; drafts use that name plus `.json`. No reconciled/draft suffix. The export panel shows the filename. Blank stores fall back to order number; filename-unsafe characters are sanitized. PDF reconciliation metadata and app identification remain unchanged.
+- Local `npm run check` passed: typecheck, 24 unit/PDF tests, production build. React review: export availability is derived from valid current data, obsolete confirmation state removed, heavy PDF generation remains dynamically loaded, and accessible editing controls remain.
+- Browser tests now cover direct export, invalid data gating, old draft reopening, stale-preview invalidation, and exact store-based PDF/draft filenames. Verify the preview branch in CI before publishing to the existing authorized production branch.
+
 ## Card-back artwork update — 21 September
 
 - User clarified that every product thumbnail should be replaced by a small standard Pokémon card back, preserving the original row layout. Shared editor/PDF drawing now always uses the bundled JPEG, including rows without source artwork and reopened drafts. No runtime external image requests.

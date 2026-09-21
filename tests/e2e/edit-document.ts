@@ -59,9 +59,7 @@ export async function editEveryField(page: Page, info: TestInfo) {
   const exportButton = page.getByRole("button", {
     name: "Download reconciled PDF",
   });
-  await expect(exportButton).toBeDisabled();
-  await page.getByRole("button", { name: "I checked every line" }).click();
-  await page.getByLabel("I checked the order details").check();
+  await expect(exportButton).toBeEnabled();
   await page.getByRole("button", { name: "Preview document" }).click();
   const preview = page.getByLabel("Reconciled document preview");
   await expect(preview.getByRole("status")).toHaveText(/^Page 1 of \d+$/);
@@ -81,19 +79,16 @@ export async function editEveryField(page: Page, info: TestInfo) {
     );
   }
   await preview.screenshot({ path: info.outputPath("exact-pdf-preview.png") });
-  // A later edit must invalidate both confirmation and the cached PDF.
+  // A later edit must invalidate the cached PDF without another confirmation.
   await page
     .getByLabel("Billing recipient", { exact: true })
     .fill("Final Buyer");
   await expect(preview).toHaveCount(0);
-  await expect(exportButton).toBeDisabled();
-  await page.getByLabel("I checked the order details").check();
+  await expect(exportButton).toBeEnabled();
   const pdfWait = page.waitForEvent("download");
   await exportButton.click();
   const pdf = await pdfWait;
-  expect(pdf.suggestedFilename()).toBe(
-    "reconciled-tcgplayer-VERIFIED-EDIT-002.pdf",
-  );
+  expect(pdf.suggestedFilename()).toBe("Updated Seller.pdf");
   const pdfPath = info.outputPath("all-fields-edited.pdf");
   await pdf.saveAs(pdfPath);
   const pages = await pdfPages(await readFile(pdfPath));
@@ -145,7 +140,9 @@ export async function editEveryField(page: Page, info: TestInfo) {
   const draftWait = page.waitForEvent("download");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   const draftPath = info.outputPath("edited-draft.json");
-  await (await draftWait).saveAs(draftPath);
+  const draft = await draftWait;
+  expect(draft.suggestedFilename()).toBe("Updated Seller.json");
+  await draft.saveAs(draftPath);
   await page.reload();
   await page.getByLabel("Open saved draft").setInputFiles(draftPath);
   for (const [label, value] of Object.entries(fields))
@@ -153,7 +150,7 @@ export async function editEveryField(page: Page, info: TestInfo) {
       label === "Billing recipient" ? "Final Buyer" : value,
     );
   await expect(page.getByTestId("grand-total")).toHaveText("$77.35");
-  await expect(exportButton).toBeDisabled();
+  await expect(exportButton).toBeEnabled();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(

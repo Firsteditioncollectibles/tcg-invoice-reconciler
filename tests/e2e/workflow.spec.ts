@@ -50,7 +50,14 @@ test("editor, consolidation, deletion, accurate totals, draft round-trip, and PD
   const exportButton = page.getByRole("button", {
     name: "Download reconciled PDF",
   });
+  await expect(exportButton).toBeEnabled();
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
+  await page.getByLabel("Order number *", { exact: true }).fill("");
   await expect(exportButton).toBeDisabled();
+  await page
+    .getByLabel("Order number *", { exact: true })
+    .fill("SAMPLE-123456");
+  await expect(exportButton).toBeEnabled();
   await page.getByRole("button", { name: "Consolidate duplicates" }).click();
   await expect(page.getByLabel("Quantity line 1", { exact: true })).toHaveValue(
     "3",
@@ -68,8 +75,6 @@ test("editor, consolidation, deletion, accurate totals, draft round-trip, and PD
   ).toBeVisible();
   await expect(exportButton).toBeDisabled();
   await page.getByLabel("Quantity line 1", { exact: true }).fill("2");
-  await page.getByRole("button", { name: "I checked every line" }).click();
-  await page.getByLabel("I checked the order details").check();
   await page.getByRole("button", { name: "Preview document" }).click();
   await expect(
     page.getByLabel("Reconciled document preview").getByRole("status"),
@@ -82,9 +87,7 @@ test("editor, consolidation, deletion, accurate totals, draft round-trip, and PD
   const pdfWait = page.waitForEvent("download");
   await exportButton.click();
   const pdf = await pdfWait;
-  expect(pdf.suggestedFilename()).toBe(
-    "reconciled-tcgplayer-SAMPLE-123456.pdf",
-  );
+  expect(pdf.suggestedFilename()).toBe("Example Cards.pdf");
   await pdf.saveAs(info.outputPath("reconciled.pdf"));
   expect(
     (await readFile(info.outputPath("reconciled.pdf")))
@@ -99,13 +102,14 @@ test("editor, consolidation, deletion, accurate totals, draft round-trip, and PD
   const draftWait = page.waitForEvent("download");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   const draft = await draftWait;
+  expect(draft.suggestedFilename()).toBe("Example Cards.json");
   await draft.saveAs(info.outputPath("draft.json"));
   await page.reload();
   await page
     .getByLabel("Open saved draft")
     .setInputFiles(info.outputPath("draft.json"));
   await expect(page.getByTestId("grand-total")).toHaveText("$2.98");
-  await expect(exportButton).toBeDisabled();
+  await expect(exportButton).toBeEnabled();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: info.outputPath("reconciler-mobile.png"),
@@ -165,8 +169,6 @@ for (const file of [
       "Sample Buyer",
     );
     await expect(page.getByTestId("grand-total")).toHaveText("$16.54");
-    await page.getByRole("button", { name: "I checked every line" }).click();
-    await page.getByLabel("I checked the order details").check();
     const wait = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download reconciled PDF" }).click();
     await (await wait).saveAs(info.outputPath("reconciled.pdf"));
@@ -196,8 +198,6 @@ test("failed PDF preparation preserves edits and lets the user retry", async ({
   await page
     .getByLabel("Billing recipient", { exact: true })
     .fill("Saved Buyer");
-  await page.getByRole("button", { name: "I checked every line" }).click();
-  await page.getByLabel("I checked the order details").check();
   await page.route("**/vendor/standard_fonts/*.ttf", (route) =>
     route.fulfill({ status: 404, body: "Missing test font" }),
   );
@@ -304,11 +304,11 @@ for (const file of [
     await expect(page.getByTestId("grand-total")).toHaveText("$72.12");
     await page.getByRole("button", { name: "Undo", exact: true }).click();
     await expect(page.getByTestId("grand-total")).toHaveText("$73.87");
-    await page.getByRole("button", { name: "I checked every line" }).click();
-    await page.getByLabel("I checked the order details").check();
     const wait = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download reconciled PDF" }).click();
-    await (await wait).saveAs(info.outputPath("marketplace-reconciled.pdf"));
+    const downloaded = await wait;
+    expect(downloaded.suggestedFilename()).toBe("Sample Card Store.pdf");
+    await downloaded.saveAs(info.outputPath("marketplace-reconciled.pdf"));
     await page.screenshot({
       path: info.outputPath("document-boxes.png"),
       fullPage: true,

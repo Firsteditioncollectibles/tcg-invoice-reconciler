@@ -26,7 +26,10 @@ test("PDF retains reconciliation metadata and filename", async () => {
   assert.equal(pdf.getNumberOfPages(), 1);
   assert.match(raw, /Buyer-prepared reconciliation/);
   assert.match(raw, /Not a seller-issued invoice/);
-  assert.equal(pdfFileName("../test"), "reconciled-tcgplayer----test.pdf");
+  assert.equal(
+    pdfFileName("EXAMPLE-001", "Example Cards"),
+    "Example Cards.pdf",
+  );
   const [text] = await pdfPages(new Uint8Array(pdf.output("arraybuffer")));
   assert.match(text, /EXAMPLE-001/);
   assert.match(text, /\$2.50/);
@@ -66,11 +69,17 @@ test("long orders paginate with wrapped descriptions", async () => {
     new Uint8Array(pdf.output("arraybuffer")),
   );
 });
-test("cannot export invalid, empty or unreviewed items", async () => {
+test("export validates required data without review checkboxes", async () => {
   const d = sample();
   await assert.rejects(createReconciledPdf({ ...d, items: [] }));
+  const unreviewed = await createReconciledPdf(
+    { ...d, items: [{ ...d.items[0], reviewed: false }] },
+    await fonts(),
+  );
+  assert.equal(unreviewed.getNumberOfPages(), 1);
+  await assert.rejects(createReconciledPdf({ ...d, orderNumber: " " }));
   await assert.rejects(
-    createReconciledPdf({ ...d, items: [{ ...d.items[0], reviewed: false }] }),
+    createReconciledPdf({ ...d, items: [{ ...d.items[0], description: " " }] }),
   );
   await assert.rejects(
     createReconciledPdf({ ...d, items: [{ ...d.items[0], quantity: "-1" }] }),

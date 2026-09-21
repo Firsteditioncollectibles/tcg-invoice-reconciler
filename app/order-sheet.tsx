@@ -169,17 +169,6 @@ export default function OrderSheet({ doc, busy, field, row, change }: Props) {
                     className="source-row-controls"
                     style={{ top: r.top, left: 1444, width: 190 }}
                   >
-                    <label>
-                      <input
-                        type="checkbox"
-                        disabled={busy}
-                        checked={item.reviewed}
-                        onChange={(e) =>
-                          row(item.id, "reviewed", e.target.checked)
-                        }
-                      />
-                      {item.reviewed ? "Reviewed" : "Mark reviewed"}
-                    </label>
                     <button
                       className="remove-line"
                       disabled={busy}

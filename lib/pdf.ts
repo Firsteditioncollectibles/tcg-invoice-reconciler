@@ -1,20 +1,16 @@
 import { jsPDF } from "jspdf";
 import { orderSheets, ORDER_WIDTH } from "./document-layout";
 import { DISCLOSURE, totals, type Invoice } from "./invoice";
+export { pdfFileName } from "./filenames";
 
 export async function createReconciledPdf(
   invoice: Invoice,
   fonts?: { regular: Uint8Array; bold: Uint8Array },
 ): Promise<jsPDF> {
   const t = totals(invoice);
-  if (
-    !t.valid ||
-    !invoice.items.length ||
-    !invoice.orderNumber.trim() ||
-    invoice.items.some((i) => !i.reviewed)
-  )
+  if (!t.valid || !invoice.items.length || !invoice.orderNumber.trim())
     throw new Error(
-      "Review all line items, enter the order number and correct invalid amounts before exporting.",
+      "Enter the order number and correct missing item details or invalid amounts before exporting.",
     );
   const doc = new jsPDF({ unit: "pt", format: "a4", compress: true });
   const loadFont = async (name: string) => {
@@ -134,7 +130,4 @@ export async function createReconciledPdf(
     }
   }
   return doc;
-}
-export function pdfFileName(orderNumber: string) {
-  return `reconciled-tcgplayer-${orderNumber.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 70) || "order"}.pdf`;
 }
