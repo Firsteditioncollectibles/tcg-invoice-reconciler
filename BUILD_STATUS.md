@@ -3,12 +3,14 @@
 Status: V1.1 screenshot-matched editing/export is LIVE at https://tcg-invoice-reconciler.vercel.app/. Code remains on `feat/tcgplayer-reconciler-v1`.
 Base: `d0eca588ee45744d6e7ac6a6eb4ef6b780edbd45` on `main`.
 
-## Card-back artwork update — current
+## Card-back artwork update — 21 September
 
 - User clarified that every product thumbnail should be replaced by a small standard Pokémon card back, preserving the original row layout. Shared editor/PDF drawing now always uses the bundled JPEG, including rows without source artwork and reopened drafts. No runtime external image requests.
 - Image source and rights attribution are recorded in `lib/card-back.ts`. No customer data is included.
 - Local `npm run check` passed: 23 unit/PDF tests, typecheck, production build. PDF checks exercise replacement of existing source thumbnails; browser checks assert all 13 rows use the same bundled JPEG.
-- Local browser checks could not launch because the previous Chromium binary was empty and its package was unavailable. Run GitHub browser checks on a preview branch before updating the authorized production branch. Then verify the hosted editor and PDF preview. This update supersedes earlier requirements for original card thumbnails.
+- Local browser checks could not launch because the previous Chromium binary was empty and its package was unavailable. GitHub Actions run **35543346062** passed the full typecheck/unit/build/browser suite on `14e239504eb5a8792623d03a82e1a9365e9bc1b6`. The hosted preview was visually verified: all 13 rows show identical card backs in the editor and actual PDF preview; quantity editing recalculates $75.85 to $73.87. This update supersedes earlier requirements for original card thumbnails.
+
+- On 21 September the user reported the live site still showed original thumbnails. Confirmed the tested change existed only on `feat/pokemon-card-backs`; production still pointed to `73f0925`. Publish the verified app plus this documentation to the already-authorized production branch, and verify READY and the public site before reporting completion. No CardScout resources are involved.
 
 ## 20 September publishing — current
 
